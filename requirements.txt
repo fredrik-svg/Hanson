@@ -1,0 +1,8 @@
+
+elevenlabs
+EfficientWord-Net
+tflite-runtime
+librosa
+pyaudio
+pixel-ring
+python-dotenv
