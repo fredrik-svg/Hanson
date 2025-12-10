@@ -7,10 +7,8 @@ This project is a Swedish voice assistant running on a Raspberry Pi 5 using:
 - Seeed Studio **ReSpeaker USB Mic Array** (USB, not HAT)
 - A Bluetooth speaker for audio output
 - The built‑in **pixel_ring** LED on the ReSpeaker to indicate assistant status
-
-Hotword detection is done locally on the Pi using **EfficientWord-Net** ("Hey Eleven").
-Once the hotword is detected, a streaming conversation is started with an ElevenLabs
-agent configured to speak Swedish.
+- A physical button between **GPIO 17** and **GND** that starts a conversation when
+  pressed
 
 ## Hardware
 
@@ -20,13 +18,9 @@ agent configured to speak Swedish.
 - Bluetooth speaker paired with Raspberry Pi
 
 > **OS-version att välja?**
-> För hotword‑motorn (EfficientWord-Net) är det bäst att stanna på den
-> ordinarie Raspberry Pi OS **Bookworm 64‑bit** som levereras med Python 3.11.
-> Nyare test/"advanced" builds som hoppar till Python 3.12 gör att hotword
-> paketet inte kan installeras. Använd alltså Bookworm (inte de senaste
-> preview‑bilderna) så fungerar installationen som beskrivet nedan. På Python
-> 3.12+ startar skriptet fortfarande, men hotword‑detektering stängs av och du
-> får starta en session genom att trycka **Enter** i terminalen.
+> Rekommenderad version är fortfarande Raspberry Pi OS **Bookworm 64‑bit**.
+> Projektet har tagit bort hotword‑motorn helt, så det fungerar även på
+> Python 3.12+ utan att behöva den äldre EfficientWord‑Net‑beroenden.
 
 ## Setup
 
@@ -50,13 +44,6 @@ agent configured to speak Swedish.
    pip install -r requirements.txt
    ```
 
-   > **Note:** EfficientWord-Net only supports Python versions below 3.12 and
-   > requires `numpy==1.22.0`. When running on newer Python versions, the
-   > hotword package is skipped and a modern `numpy` is installed instead so
-   > that the rest of the environment can be set up without build failures.
-   > To use hotword detection, run the project with Python 3.11 (or older)
-   > where EfficientWord-Net can be installed.
-
 4. Make sure your ReSpeaker USB Mic Array is plugged in and recognized as
    a USB audio input device (`arecord -l` should list it).
 
@@ -79,18 +66,6 @@ export ELEVENLABS_API_KEY="your_api_key_here"
 export ELEVENLABS_AGENT_ID="your_agent_id_here"
 ```
 
-## Hotword reference
-
-This project expects a hotword reference file at:
-
-```text
-hotword_refs/hey_eleven_ref.json
-```
-
-Follow the ElevenLabs Raspberry Pi / EfficientWord-Net guide to record and
-generate this reference JSON for the hotword `hey_eleven` (or change the code
-and file name if you use another hotword).
-
 ## Running
 
 From the project folder on your Pi:
@@ -100,14 +75,13 @@ source .venv/bin/activate
 python hotword.py
 ```
 
-The assistant will listen for the hotword:
+The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 
-- When you say **"Hey Eleven"**, the hotword detector will trigger.
-- The conversation with the ElevenLabs agent starts.
+- Press the button to start a conversation with the ElevenLabs agent.
 - The ReSpeaker **pixel ring** shows different patterns when listening,
   thinking and speaking.
-- When the conversation ends, the mic stream is reset so you can wake
-  the assistant again.
+- When the conversation ends, the script returns to waiting for the next
+  button press.
 
 ## Notes
 

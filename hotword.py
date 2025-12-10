@@ -1,28 +1,8 @@
 
+import importlib.util
 import os
 import signal
-import sys
 import time
-
-HOTWORD_AVAILABLE = sys.version_info < (3, 12)
-
-if HOTWORD_AVAILABLE:
-    try:
-        from eff_word_net.streams import SimpleMicStream
-        from eff_word_net.engine import HotwordDetector
-        from eff_word_net.audio_processing import Resnet50_Arc_loss
-    except Exception as exc:  # pragma: no cover - best effort fallback
-        print(
-            "Hotword-biblioteket kunde inte laddas. "
-            "Fortsätter utan hotword-detektering (starta manuellt)."
-        )
-        print(f"Detaljer: {exc}")
-        HOTWORD_AVAILABLE = False
-else:
-    print(
-        "Hotword-detektering stöds inte i Python 3.12+. "
-        "Fortsätter utan hotword (starta sessioner manuellt)."
-    )
 
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import (
@@ -33,8 +13,12 @@ from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInt
 
 from pixel_ring import pixel_ring
 
-convai_active = False
-mic_stream = None
+BUTTON_PIN = 17
+
+GPIO_AVAILABLE = importlib.util.find_spec("RPi.GPIO") is not None
+
+if GPIO_AVAILABLE:
+    import RPi.GPIO as GPIO
 
 elevenlabs = ElevenLabs()
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
@@ -55,19 +39,6 @@ dynamic_vars = {
 config = ConversationInitiationData(
     dynamic_variables=dynamic_vars
 )
-
-eleven_hw = None
-
-if HOTWORD_AVAILABLE:
-    base_model = Resnet50_Arc_loss()
-    eleven_hw = HotwordDetector(
-        hotword="hey_eleven",
-        model=base_model,
-        reference_file=os.path.join("hotword_refs", "hey_eleven_ref.json"),
-        threshold=0.7,
-        relaxation_time=2,
-    )
-
 
 def ring_idle():
     """LED-ring av (idle-läge)."""
@@ -128,49 +99,10 @@ def create_conversation():
     )
 
 
-def start_mic_stream():
-    """Starta eller starta om mikrofonströmmen."""
-    global mic_stream
-
-    if not HOTWORD_AVAILABLE:
-        return
-
-    try:
-        mic_stream = SimpleMicStream(
-            window_length_secs=1.5,
-            sliding_window_secs=0.75,
-        )
-        mic_stream.start_stream()
-        print("Mikrofonström startad")
-    except Exception as e:
-        print(f"Fel vid start av mikrofonström: {e}")
-        mic_stream = None
-        time.sleep(1)
-
-
-def stop_mic_stream():
-    """Stäng mikrofonströmmen säkert."""
-    global mic_stream
-
-    if not HOTWORD_AVAILABLE:
-        mic_stream = None
-        return
-
-    try:
-        if mic_stream:
-            mic_stream = None
-            print("Mikrofonström stoppad")
-    except Exception as e:
-        print(f"Fel vid stopp av mikrofonström: {e}")
-
-
 def start_conversation_flow():
     """Starta en ElevenLabs-session och hantera städning."""
 
-    global convai_active
-
     print("Startar ElevenLabs-session...")
-    convai_active = True
     ring_listening()
 
     try:
@@ -192,25 +124,18 @@ def start_conversation_flow():
     except Exception as e:
         print(f"Fel under konversation: {e}")
     finally:
-        convai_active = False
         print("Session slut, städar upp...")
         ring_idle()
         time.sleep(1)
 
-        if HOTWORD_AVAILABLE:
-            start_mic_stream()
-            print("Redo för nästa hotword...")
-
 
 def main():
-    global convai_active
-
     ring_idle()
 
-    if not HOTWORD_AVAILABLE:
+    if not GPIO_AVAILABLE:
         print(
-            "Hotword-detektering är avstängd. Tryck Enter för att starta en konversation "
-            "manuellt eller CTRL+C för att avsluta."
+            "RPi.GPIO saknas. Tryck Enter för att starta en konversation "
+            "manuellt eller installera biblioteket på din Raspberry Pi."
         )
         try:
             while True:
@@ -222,37 +147,23 @@ def main():
             ring_idle()
         return
 
-    start_mic_stream()
-    print("Säg 'Hey Eleven' för att väcka assistenten")
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-    while True:
-        if not convai_active:
-            try:
-                if mic_stream is None:
-                    start_mic_stream()
-                    continue
+    print(
+        "Hotword-stöd är borttaget. Tryck på knappen mellan GPIO 17 och GND "
+        "för att starta en konversation (CTRL+C för att avsluta)."
+    )
 
-                frame = mic_stream.getFrame()
-                result = eleven_hw.scoreFrame(frame)
-                if result is None:
-                    continue
-
-                if result.get("match"):
-                    print("Hotword uppfattat", result.get("confidence"))
-                    stop_mic_stream()
-                    start_conversation_flow()
-
-            except KeyboardInterrupt:
-                print("Avslutar via CTRL+C...")
-                break
-            except Exception as e:
-                print(f"Fel i hotword-loop: {e}")
-                mic_stream = None
-                time.sleep(1)
-                start_mic_stream()
-
-    # Stäng av LED-ring vid avslut
-    ring_idle()
+    try:
+        while True:
+            GPIO.wait_for_edge(BUTTON_PIN, GPIO.FALLING, bouncetime=300)
+            start_conversation_flow()
+    except KeyboardInterrupt:
+        print("Avslutar via CTRL+C...")
+    finally:
+        ring_idle()
+        GPIO.cleanup()
 
 
 if __name__ == "__main__":
