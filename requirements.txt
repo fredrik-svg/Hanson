@@ -1,6 +1,7 @@
 setuptools
-# numpy 1.22.0 is the latest version compatible with EfficientWord-Net
-numpy==1.22.0
+# Pin a recent numpy that provides wheels on Python 3.13 to avoid build failures
+# when EfficientWord-Net pulls in an older release.
+numpy==2.3.5
 elevenlabs
 EfficientWord-Net==1.0.2
 ai-edge-litert
