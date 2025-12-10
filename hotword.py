@@ -39,9 +39,7 @@ dynamic_vars = {
     "language": "svenska",
 }
 
-config = ConversationInitiationData(
-    dynamic_variables=dynamic_vars
-)
+config = ConversationInitiationData(dynamic_variables=dynamic_vars)
 
 def ring_idle():
     """LED-ring av (idle-läge)."""
@@ -132,41 +130,58 @@ def start_conversation_flow():
         time.sleep(1)
 
 
-def main():
-    ring_idle()
-
-    if not GPIO_AVAILABLE:
-        print(
-            "RPi.GPIO saknas. Tryck Enter för att starta en konversation "
-            "manuellt eller installera biblioteket på din Raspberry Pi."
-        )
-        try:
-            while True:
-                input("\nStarta ny session (Enter): ")
-                start_conversation_flow()
-        except KeyboardInterrupt:
-            print("Avslutar via CTRL+C...")
-        finally:
-            ring_idle()
-        return
-
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+def manual_conversation_prompt():
+    """Fallback-läge när GPIO-knappen inte kan användas."""
 
     print(
-        "Hotword-stöd är borttaget. Tryck på knappen mellan GPIO 17 och GND "
-        "för att starta en konversation (CTRL+C för att avsluta)."
+        "RPi.GPIO saknas eller kan inte användas. Tryck Enter för att starta "
+        "en konversation manuellt."
     )
-
     try:
         while True:
-            GPIO.wait_for_edge(BUTTON_PIN, GPIO.FALLING, bouncetime=300)
+            input("\nStarta ny session (Enter): ")
             start_conversation_flow()
     except KeyboardInterrupt:
         print("Avslutar via CTRL+C...")
     finally:
         ring_idle()
-        GPIO.cleanup()
+
+
+def main():
+    ring_idle()
+
+    if not GPIO_AVAILABLE:
+        manual_conversation_prompt()
+        return
+
+    try:
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+        print(
+            "Hotword-stöd är borttaget. Tryck på knappen mellan GPIO 17 och "
+            "GND för att starta en konversation (CTRL+C för att avsluta)."
+        )
+
+        while True:
+            try:
+                GPIO.wait_for_edge(BUTTON_PIN, GPIO.FALLING, bouncetime=300)
+            except RuntimeError as e:
+                print(
+                    "Kunde inte lyssna på knappen via GPIO. Växlar till "
+                    "manuellt läge."
+                )
+                print(f"Detaljer: {e}")
+                manual_conversation_prompt()
+                return
+
+            start_conversation_flow()
+    except KeyboardInterrupt:
+        print("Avslutar via CTRL+C...")
+    finally:
+        ring_idle()
+        if GPIO_AVAILABLE:
+            GPIO.cleanup()
 
 
 if __name__ == "__main__":
