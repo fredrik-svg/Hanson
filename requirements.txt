@@ -1,14 +1,7 @@
 setuptools
-# EfficientWord-Net currently requires numpy 1.22.0 and Python < 3.12.
-# Use the legacy pins when running on supported runtimes, but fall back to a
-# modern numpy to keep installs working on newer Python versions (hotword
-# detection will be unavailable there).
-numpy==1.22.0; python_version < "3.12"
-numpy==2.1.3; python_version >= "3.12"
+numpy==2.1.3
 elevenlabs
-EfficientWord-Net==1.0.2; python_version < "3.12"
-ai-edge-litert
-librosa
 pyaudio
 pixel-ring
 python-dotenv
+RPi.GPIO; sys_platform == "linux"
