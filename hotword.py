@@ -23,7 +23,6 @@ if GPIO_AVAILABLE:
 
 load_dotenv()
 
-elevenlabs = ElevenLabs()
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
 
@@ -31,6 +30,8 @@ if not agent_id:
     raise RuntimeError("ELEVENLABS_AGENT_ID is not set in the environment")
 if not api_key:
     raise RuntimeError("ELEVENLABS_API_KEY is not set in the environment")
+
+elevenlabs = ElevenLabs(api_key=api_key)
 
 # Dynamiska variabler som kan användas i din agentprompt
 dynamic_vars = {
@@ -123,7 +124,13 @@ def start_conversation_flow():
         print(f"Samtals-ID: {conversation_id}")
 
     except Exception as e:
-        print(f"Fel under konversation: {e}")
+        error_text = str(e)
+        print(f"Fel under konversation: {error_text}")
+        if "needs_authorization" in error_text or "authorization" in error_text:
+            print(
+                "Kontrollera att ELEVENLABS_API_KEY är korrekt satt och att "
+                "nyckeln har behörighet för valt agent-ID."
+            )
     finally:
         print("Session slut, städar upp...")
         ring_idle()
