@@ -1,7 +1,7 @@
 
 elevenlabs
 EfficientWord-Net
-tflite-runtime
+ai-edge-litert
 librosa
 pyaudio
 pixel-ring
