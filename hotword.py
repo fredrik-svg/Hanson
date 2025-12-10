@@ -141,7 +141,7 @@ def main():
 
     start_mic_stream()
     ring_idle()
-    print("Säg 'Hey Eleven' för att väcka assistenten"")
+    print("Säg 'Hey Eleven' för att väcka assistenten")
 
     while True:
         if not convai_active:
