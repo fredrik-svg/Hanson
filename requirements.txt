@@ -1,4 +1,5 @@
 setuptools
+numpy==2.3.5
 elevenlabs
 EfficientWord-Net
 ai-edge-litert
