@@ -19,6 +19,13 @@ agent configured to speak Swedish.
 - Seeed Studio ReSpeaker USB Mic Array
 - Bluetooth speaker paired with Raspberry Pi
 
+> **OS-version att välja?**
+> För hotword‑motorn (EfficientWord-Net) är det bäst att stanna på den
+> ordinarie Raspberry Pi OS **Bookworm 64‑bit** som levereras med Python 3.11.
+> Nyare test/"advanced" builds som hoppar till Python 3.12 gör att hotword
+> paketet inte kan installeras. Använd alltså Bookworm (inte de senaste
+> preview‑bilderna) så fungerar installationen som beskrivet nedan.
+
 ## Setup
 
 1. Clone this repo to your Pi:
@@ -41,11 +48,12 @@ agent configured to speak Swedish.
    pip install -r requirements.txt
    ```
 
-   > **Note:** EfficientWord-Net pulls in an old `numpy` release (1.22) that
-   > does not ship wheels for newer Python versions (e.g. Python 3.13), which
-   > triggers a `Cannot import 'setuptools.build_meta'` error when pip tries to
-   > build from source. The `requirements.txt` file now pins `numpy` 2.3.5 to
-   > ensure a compatible wheel is installed automatically.
+   > **Note:** EfficientWord-Net only supports Python versions below 3.12 and
+   > requires `numpy==1.22.0`. When running on newer Python versions, the
+   > hotword package is skipped and a modern `numpy` is installed instead so
+   > that the rest of the environment can be set up without build failures.
+   > To use hotword detection, run the project with Python 3.11 (or older)
+   > where EfficientWord-Net can be installed.
 
 4. Make sure your ReSpeaker USB Mic Array is plugged in and recognized as
    a USB audio input device (`arecord -l` should list it).
