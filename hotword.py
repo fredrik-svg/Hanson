@@ -12,16 +12,38 @@ from elevenlabs.conversational_ai.conversation import (
 )
 from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
-from pixel_ring import pixel_ring
+
+load_dotenv()
 
 BUTTON_PIN = 17
 
 GPIO_AVAILABLE = importlib.util.find_spec("RPi.GPIO") is not None
+PIXEL_RING_SUPPORTED = importlib.util.find_spec("pixel_ring") is not None
+
+status_led_pin_env = os.getenv("STATUS_LED_PIN")
+try:
+    STATUS_LED_PIN = int(status_led_pin_env) if status_led_pin_env else None
+except ValueError:
+    print(
+        "Ogiltigt värde för STATUS_LED_PIN – ange ett GPIO-nummer, t.ex. 27. "
+        "Ignorerar LED-konfigurationen."
+    )
+    STATUS_LED_PIN = None
+
+STATUS_LED_ACTIVE_HIGH = os.getenv("STATUS_LED_ACTIVE_HIGH", "1") != "0"
+USE_PIXEL_RING = (
+    os.getenv("USE_PIXEL_RING", "1") != "0"
+    and PIXEL_RING_SUPPORTED
+    and STATUS_LED_PIN is None
+)
 
 if GPIO_AVAILABLE:
     import RPi.GPIO as GPIO
 
-load_dotenv()
+if USE_PIXEL_RING:
+    from pixel_ring import pixel_ring
+else:
+    pixel_ring = None
 
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
@@ -42,36 +64,92 @@ dynamic_vars = {
 
 config = ConversationInitiationData(dynamic_variables=dynamic_vars)
 
+STATUS_LED_INITIALIZED = False
+
+
+def setup_status_led():
+    """Initiera status-LED via GPIO om en pinne är angiven."""
+
+    global STATUS_LED_INITIALIZED
+
+    if not GPIO_AVAILABLE or STATUS_LED_PIN is None:
+        return
+
+    try:
+        GPIO.setup(
+            STATUS_LED_PIN,
+            GPIO.OUT,
+            initial=GPIO.LOW if STATUS_LED_ACTIVE_HIGH else GPIO.HIGH,
+        )
+        STATUS_LED_INITIALIZED = True
+        print(
+            f"Status-LED styrs via GPIO {STATUS_LED_PIN} (aktiveras med "
+            f"{'HIGH' if STATUS_LED_ACTIVE_HIGH else 'LOW'})."
+        )
+    except RuntimeError as e:
+        print(
+            "Kunde inte initiera status-LED via GPIO. Kontrollera att skriptet "
+            "körs med root-behörighet och att pinnen inte används av något "
+            "annat."
+        )
+        print(f"Detaljer: {e}")
+
+
+def set_status_led(active: bool):
+    """Sätt på/av status-LED om den är initierad."""
+
+    if not STATUS_LED_INITIALIZED:
+        return
+
+    level = GPIO.HIGH if (active == STATUS_LED_ACTIVE_HIGH) else GPIO.LOW
+    try:
+        GPIO.output(STATUS_LED_PIN, level)
+    except RuntimeError as e:
+        print(f"Kunde inte styra status-LED: {e}")
+
+
 def ring_idle():
     """LED-ring av (idle-läge)."""
-    try:
-        pixel_ring.off()
-    except Exception as e:
-        print(f"Kunde inte stänga av LED-ring: {e}")
+    set_status_led(False)
+
+    if USE_PIXEL_RING:
+        try:
+            pixel_ring.off()
+        except Exception as e:
+            print(f"Kunde inte stänga av LED-ring: {e}")
 
 
 def ring_listening():
     """LED indikerar att assistenten är väckt och redo att lyssna."""
-    try:
-        pixel_ring.wakeup()
-    except Exception as e:
-        print(f"Kunde inte sätta LED till wakeup: {e}")
+    set_status_led(True)
+
+    if USE_PIXEL_RING:
+        try:
+            pixel_ring.wakeup()
+        except Exception as e:
+            print(f"Kunde inte sätta LED till wakeup: {e}")
 
 
 def ring_thinking():
     """LED indikerar att agenten tänker/bearbetar."""
-    try:
-        pixel_ring.think()
-    except Exception as e:
-        print(f"Kunde inte sätta LED till think: {e}")
+    set_status_led(True)
+
+    if USE_PIXEL_RING:
+        try:
+            pixel_ring.think()
+        except Exception as e:
+            print(f"Kunde inte sätta LED till think: {e}")
 
 
 def ring_speaking():
     """LED indikerar att agenten pratar."""
-    try:
-        pixel_ring.speak()
-    except Exception as e:
-        print(f"Kunde inte sätta LED till speak: {e}")
+    set_status_led(True)
+
+    if USE_PIXEL_RING:
+        try:
+            pixel_ring.speak()
+        except Exception as e:
+            print(f"Kunde inte sätta LED till speak: {e}")
 
 
 def create_conversation():
@@ -154,6 +232,26 @@ def manual_conversation_prompt():
         ring_idle()
 
 
+def setup_button() -> bool:
+    """Konfigurera GPIO-knappen och ge hjälpsam felsökningsinfo."""
+
+    try:
+        GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    except RuntimeError as e:
+        print("Kunde inte konfigurera knappen via GPIO.")
+        if hasattr(os, "geteuid") and os.geteuid() != 0:
+            print("RPi.GPIO kräver root-behörighet. Kör skriptet med sudo.")
+        print(f"Detaljer: {e}")
+        return False
+
+    initial_state = GPIO.input(BUTTON_PIN)
+    print(
+        f"Knapp på GPIO {BUTTON_PIN} initierad (pull-up). Startläge: "
+        f"{'NEDTRYCKT' if initial_state == GPIO.LOW else 'uppläppt'}."
+    )
+    return True
+
+
 def main():
     ring_idle()
 
@@ -162,8 +260,22 @@ def main():
         return
 
     try:
+        if not USE_PIXEL_RING:
+            print(
+                "Pixel-ring är inaktiverad. Använder GPIO-LED om den är "
+                "konfigurerad eller kör utan ljus."
+            )
+
+        if hasattr(os, "geteuid") and os.geteuid() != 0:
+            print("Varning: RPi.GPIO svarar normalt bara för root. Kör med sudo.")
+
+        GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        setup_status_led()
+
+        if not setup_button():
+            manual_conversation_prompt()
+            return
 
         print(
             "Hotword-stöd är borttaget. Tryck på knappen mellan GPIO 17 och "
@@ -172,7 +284,9 @@ def main():
 
         while True:
             try:
-                GPIO.wait_for_edge(BUTTON_PIN, GPIO.FALLING, bouncetime=300)
+                channel = GPIO.wait_for_edge(
+                    BUTTON_PIN, GPIO.FALLING, bouncetime=300, timeout=10000
+                )
             except RuntimeError as e:
                 print(
                     "Kunde inte lyssna på knappen via GPIO. Växlar till "
@@ -181,6 +295,10 @@ def main():
                 print(f"Detaljer: {e}")
                 manual_conversation_prompt()
                 return
+
+            if channel is None:
+                print("Ingen knapptryckning upptäcktes på 10 sekunder...")
+                continue
 
             start_conversation_flow()
     except KeyboardInterrupt:
