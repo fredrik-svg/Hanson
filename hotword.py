@@ -4,22 +4,25 @@ import signal
 import sys
 import time
 
+HOTWORD_AVAILABLE = sys.version_info < (3, 12)
 
-def ensure_supported_runtime() -> None:
-    """Exit early with a clear message when running on an unsupported Python."""
-
-    if sys.version_info >= (3, 12):
-        sys.exit(
-            "Hotword detection is unavailable on Python 3.12+. "
-            "Use Python 3.11 or lower to run this script."
+if HOTWORD_AVAILABLE:
+    try:
+        from eff_word_net.streams import SimpleMicStream
+        from eff_word_net.engine import HotwordDetector
+        from eff_word_net.audio_processing import Resnet50_Arc_loss
+    except Exception as exc:  # pragma: no cover - best effort fallback
+        print(
+            "Hotword-biblioteket kunde inte laddas. "
+            "Fortsätter utan hotword-detektering (starta manuellt)."
         )
-
-
-ensure_supported_runtime()
-
-from eff_word_net.streams import SimpleMicStream
-from eff_word_net.engine import HotwordDetector
-from eff_word_net.audio_processing import Resnet50_Arc_loss
+        print(f"Detaljer: {exc}")
+        HOTWORD_AVAILABLE = False
+else:
+    print(
+        "Hotword-detektering stöds inte i Python 3.12+. "
+        "Fortsätter utan hotword (starta sessioner manuellt)."
+    )
 
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import (
@@ -53,15 +56,17 @@ config = ConversationInitiationData(
     dynamic_variables=dynamic_vars
 )
 
-base_model = Resnet50_Arc_loss()
+eleven_hw = None
 
-eleven_hw = HotwordDetector(
-    hotword="hey_eleven",
-    model=base_model,
-    reference_file=os.path.join("hotword_refs", "hey_eleven_ref.json"),
-    threshold=0.7,
-    relaxation_time=2,
-)
+if HOTWORD_AVAILABLE:
+    base_model = Resnet50_Arc_loss()
+    eleven_hw = HotwordDetector(
+        hotword="hey_eleven",
+        model=base_model,
+        reference_file=os.path.join("hotword_refs", "hey_eleven_ref.json"),
+        threshold=0.7,
+        relaxation_time=2,
+    )
 
 
 def ring_idle():
@@ -126,6 +131,10 @@ def create_conversation():
 def start_mic_stream():
     """Starta eller starta om mikrofonströmmen."""
     global mic_stream
+
+    if not HOTWORD_AVAILABLE:
+        return
+
     try:
         mic_stream = SimpleMicStream(
             window_length_secs=1.5,
@@ -142,6 +151,11 @@ def start_mic_stream():
 def stop_mic_stream():
     """Stäng mikrofonströmmen säkert."""
     global mic_stream
+
+    if not HOTWORD_AVAILABLE:
+        mic_stream = None
+        return
+
     try:
         if mic_stream:
             mic_stream = None
@@ -150,11 +164,65 @@ def stop_mic_stream():
         print(f"Fel vid stopp av mikrofonström: {e}")
 
 
+def start_conversation_flow():
+    """Starta en ElevenLabs-session och hantera städning."""
+
+    global convai_active
+
+    print("Startar ElevenLabs-session...")
+    convai_active = True
+    ring_listening()
+
+    try:
+        conversation = create_conversation()
+        conversation.start_session()
+
+        def signal_handler(sig, frame):
+            print("Avbryter session...")
+            try:
+                conversation.end_session()
+            except Exception as e:
+                print(f"Fel vid avslut av session: {e}")
+
+        signal.signal(signal.SIGINT, signal_handler)
+
+        conversation_id = conversation.wait_for_session_end()
+        print(f"Samtals-ID: {conversation_id}")
+
+    except Exception as e:
+        print(f"Fel under konversation: {e}")
+    finally:
+        convai_active = False
+        print("Session slut, städar upp...")
+        ring_idle()
+        time.sleep(1)
+
+        if HOTWORD_AVAILABLE:
+            start_mic_stream()
+            print("Redo för nästa hotword...")
+
+
 def main():
     global convai_active
 
-    start_mic_stream()
     ring_idle()
+
+    if not HOTWORD_AVAILABLE:
+        print(
+            "Hotword-detektering är avstängd. Tryck Enter för att starta en konversation "
+            "manuellt eller CTRL+C för att avsluta."
+        )
+        try:
+            while True:
+                input("\nStarta ny session (Enter): ")
+                start_conversation_flow()
+        except KeyboardInterrupt:
+            print("Avslutar via CTRL+C...")
+        finally:
+            ring_idle()
+        return
+
+    start_mic_stream()
     print("Säg 'Hey Eleven' för att väcka assistenten")
 
     while True:
@@ -172,36 +240,7 @@ def main():
                 if result.get("match"):
                     print("Hotword uppfattat", result.get("confidence"))
                     stop_mic_stream()
-
-                    print("Startar ElevenLabs-session...")
-                    convai_active = True
-                    ring_listening()
-
-                    try:
-                        conversation = create_conversation()
-                        conversation.start_session()
-
-                        def signal_handler(sig, frame):
-                            print("Avbryter session...")
-                            try:
-                                conversation.end_session()
-                            except Exception as e:
-                                print(f"Fel vid avslut av session: {e}")
-
-                        signal.signal(signal.SIGINT, signal_handler)
-
-                        conversation_id = conversation.wait_for_session_end()
-                        print(f"Samtals-ID: {conversation_id}")
-
-                    except Exception as e:
-                        print(f"Fel under konversation: {e}")
-                    finally:
-                        convai_active = False
-                        print("Session slut, städar upp...")
-                        ring_idle()
-                        time.sleep(1)
-                        start_mic_stream()
-                        print("Redo för nästa hotword...")
+                    start_conversation_flow()
 
             except KeyboardInterrupt:
                 print("Avslutar via CTRL+C...")

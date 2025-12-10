@@ -24,7 +24,9 @@ agent configured to speak Swedish.
 > ordinarie Raspberry Pi OS **Bookworm 64‑bit** som levereras med Python 3.11.
 > Nyare test/"advanced" builds som hoppar till Python 3.12 gör att hotword
 > paketet inte kan installeras. Använd alltså Bookworm (inte de senaste
-> preview‑bilderna) så fungerar installationen som beskrivet nedan.
+> preview‑bilderna) så fungerar installationen som beskrivet nedan. På Python
+> 3.12+ startar skriptet fortfarande, men hotword‑detektering stängs av och du
+> får starta en session genom att trycka **Enter** i terminalen.
 
 ## Setup
 
