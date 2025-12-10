@@ -4,6 +4,7 @@ import os
 import signal
 import time
 
+from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import (
     Conversation,
@@ -19,6 +20,8 @@ GPIO_AVAILABLE = importlib.util.find_spec("RPi.GPIO") is not None
 
 if GPIO_AVAILABLE:
     import RPi.GPIO as GPIO
+
+load_dotenv()
 
 elevenlabs = ElevenLabs()
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
