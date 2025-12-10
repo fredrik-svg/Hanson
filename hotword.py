@@ -1,7 +1,14 @@
 
 import os
 import signal
+import sys
 import time
+
+if sys.version_info >= (3, 12):
+    raise RuntimeError(
+        "EfficientWord-Net currently supports Python versions below 3.12. "
+        "Use Python 3.11 or lower to enable hotword detection."
+    )
 
 from eff_word_net.streams import SimpleMicStream
 from eff_word_net.engine import HotwordDetector
