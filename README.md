@@ -83,6 +83,24 @@ The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 - When the conversation ends, the script returns to waiting for the next
   button press.
 
+> **GPIO-behörighet**
+> `RPi.GPIO` kräver root. Om knappen inte reagerar – kör skriptet med `sudo`
+> eller lägg till lämplig `udev`-regel.
+
+## GPIO LED in place of the pixel ring
+
+If you prefer a simple LED connected directly to the Raspberry Pi instead of
+the ReSpeaker pixel ring, set these environment variables before running
+`hotword.py`:
+
+- `STATUS_LED_PIN` – GPIO number for the LED (e.g. `27`).
+- `STATUS_LED_ACTIVE_HIGH` – set to `0` if your LED lights when driven LOW
+  (default is `1`, i.e. active HIGH).
+- `USE_PIXEL_RING=0` – optional; forces the pixel ring off even if available.
+
+With `STATUS_LED_PIN` set, the script will drive that pin HIGH/LOW to show the
+assistant state.
+
 ## Notes
 
 - The code and comments are mostly in Swedish since the target use‑case is a
