@@ -26,6 +26,7 @@ wheels/
 venv/
 ENV/
 env/
+test_venv/
 
 # IDE
 .vscode/

@@ -1,4 +1,4 @@
-
+setuptools
 elevenlabs
 EfficientWord-Net
 ai-edge-litert
