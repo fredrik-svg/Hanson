@@ -41,6 +41,12 @@ agent configured to speak Swedish.
    pip install -r requirements.txt
    ```
 
+   > **Note:** EfficientWord-Net pulls in an old `numpy` release (1.22) that
+   > does not ship wheels for newer Python versions (e.g. Python 3.13), which
+   > triggers a `Cannot import 'setuptools.build_meta'` error when pip tries to
+   > build from source. The `requirements.txt` file now pins `numpy` 2.3.5 to
+   > ensure a compatible wheel is installed automatically.
+
 4. Make sure your ReSpeaker USB Mic Array is plugged in and recognized as
    a USB audio input device (`arecord -l` should list it).
 
