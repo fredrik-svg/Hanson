@@ -289,12 +289,11 @@ def main():
             "GND to start a conversation (CTRL+C to exit)."
         )
 
-        button_pressed = False
+        button_event = threading.Event()
 
         def button_callback(channel):
             """Callback for button press detection."""
-            nonlocal button_pressed
-            button_pressed = True
+            button_event.set()
 
         try:
             GPIO.add_event_detect(
@@ -310,10 +309,9 @@ def main():
             return
 
         while True:
-            if button_pressed:
-                button_pressed = False
+            if button_event.wait(timeout=0.1):
+                button_event.clear()
                 start_conversation_flow()
-            time.sleep(0.1)
     except KeyboardInterrupt:
         print("Avslutar via CTRL+C...")
     finally:
@@ -321,8 +319,8 @@ def main():
         if GPIO_AVAILABLE:
             try:
                 GPIO.remove_event_detect(BUTTON_PIN)
-            except (RuntimeError, ValueError):
-                pass
+            except (RuntimeError, ValueError) as e:
+                print(f"Warning: Could not remove event detection: {e}")
             GPIO.cleanup()
 
 
