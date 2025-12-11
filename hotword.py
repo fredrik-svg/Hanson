@@ -17,6 +17,8 @@ from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInt
 load_dotenv()
 
 BUTTON_PIN = 17
+BUTTON_DEBOUNCE_TIME = 0.3  # seconds
+BUTTON_POLL_INTERVAL = 0.05  # seconds
 
 GPIO_AVAILABLE = False
 GPIO_IMPORT_ERROR = None
@@ -289,38 +291,31 @@ def main():
             "GND to start a conversation (CTRL+C to exit)."
         )
 
-        button_event = threading.Event()
-
-        def button_callback(channel):
-            """Callback for button press detection."""
-            button_event.set()
-
-        try:
-            GPIO.add_event_detect(
-                BUTTON_PIN, GPIO.FALLING, callback=button_callback, bouncetime=300
-            )
-        except RuntimeError as e:
-            print(
-                "Could not set up button event detection via GPIO. "
-                "Switching to manual mode."
-            )
-            print(f"Details: {e}")
-            manual_conversation_prompt()
-            return
+        # Use polling instead of interrupt-based event detection
+        # This is more reliable on Raspberry Pi 5
+        last_button_state = GPIO.HIGH
+        last_press_time = 0
 
         while True:
-            if button_event.wait(timeout=0.1):
-                button_event.clear()
+            current_button_state = GPIO.input(BUTTON_PIN)
+            current_time = time.time()
+
+            # Detect button press (transition from HIGH to LOW)
+            if (
+                last_button_state == GPIO.HIGH
+                and current_button_state == GPIO.LOW
+                and (current_time - last_press_time) > BUTTON_DEBOUNCE_TIME
+            ):
+                last_press_time = current_time
                 start_conversation_flow()
+
+            last_button_state = current_button_state
+            time.sleep(BUTTON_POLL_INTERVAL)
     except KeyboardInterrupt:
         print("Avslutar via CTRL+C...")
     finally:
         ring_idle()
         if GPIO_AVAILABLE:
-            try:
-                GPIO.remove_event_detect(BUTTON_PIN)
-            except (RuntimeError, ValueError) as e:
-                print(f"Warning: Could not remove event detection: {e}")
             GPIO.cleanup()
 
 
