@@ -108,6 +108,8 @@ def ring_listening():
 
 def ring_thinking():
     """LED indicates the agent is thinking/processing."""
+    set_status_led(False)
+    time.sleep(0.05)
     set_status_led(True)
 
 
@@ -128,7 +130,7 @@ def create_conversation():
         ring_speaking()
 
     def on_user_transcript(transcript: str):
-        print(f"Du: {transcript}")
+        print(f"You: {transcript}")
         ring_thinking()
 
     return Conversation(
