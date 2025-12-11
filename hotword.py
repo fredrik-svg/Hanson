@@ -225,9 +225,7 @@ def main():
         return
 
     try:
-        print(
-            "Använder GPIO-LED om den är konfigurerad, annars körs utan ljus."
-        )
+        print("Using GPIO LED if configured; otherwise running without light.")
 
         if hasattr(os, "geteuid") and os.geteuid() != 0:
             print("Varning: RPi.GPIO svarar normalt bara för root. Kör med sudo.")
