@@ -60,6 +60,24 @@ dynamic_vars = {
 config = ConversationInitiationData(dynamic_variables=dynamic_vars)
 
 STATUS_LED_INITIALIZED = False
+THINKING_TIMER = None
+
+
+def _complete_thinking():
+    """Reset thinking blink state."""
+
+    global THINKING_TIMER
+    set_status_led(False)
+    THINKING_TIMER = None
+
+
+def _cancel_thinking_timer():
+    """Cancel any pending thinking blink."""
+
+    global THINKING_TIMER
+    if THINKING_TIMER:
+        THINKING_TIMER.cancel()
+        THINKING_TIMER = None
 
 
 def setup_status_led():
@@ -104,27 +122,38 @@ def set_status_led(active: bool):
 
 def ring_idle():
     """LED off (idle state)."""
+    _cancel_thinking_timer()
     set_status_led(False)
 
 
 def ring_listening():
     """LED indicates the assistant is awake and ready to listen."""
+    _cancel_thinking_timer()
     set_status_led(True)
 
 
 def ring_thinking():
     """LED indicates the agent is thinking/processing."""
+    global THINKING_TIMER
+
+    if THINKING_TIMER:
+        THINKING_TIMER.cancel()
+        THINKING_TIMER = None
+
     if THINKING_BLINK_SECONDS > 0:
-        set_status_led(False)
-        threading.Timer(
-            THINKING_BLINK_SECONDS, set_status_led, args=(True,)
-        ).start()
+        set_status_led(True)
+        THINKING_TIMER = threading.Timer(
+            THINKING_BLINK_SECONDS, _complete_thinking
+        )
+        THINKING_TIMER.daemon = True
+        THINKING_TIMER.start()
     else:
         set_status_led(True)
 
 
 def ring_speaking():
     """LED indicates the agent is speaking."""
+    _cancel_thinking_timer()
     set_status_led(True)
 
 
