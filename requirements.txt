@@ -2,6 +2,5 @@ setuptools
 numpy==2.1.3
 elevenlabs
 pyaudio
-pixel-ring
 python-dotenv
 RPi.GPIO; sys_platform == "linux"

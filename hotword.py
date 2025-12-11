@@ -18,7 +18,6 @@ load_dotenv()
 BUTTON_PIN = 17
 
 GPIO_AVAILABLE = importlib.util.find_spec("RPi.GPIO") is not None
-PIXEL_RING_SUPPORTED = importlib.util.find_spec("pixel_ring") is not None
 
 status_led_pin_env = os.getenv("STATUS_LED_PIN")
 try:
@@ -31,19 +30,9 @@ except ValueError:
     STATUS_LED_PIN = None
 
 STATUS_LED_ACTIVE_HIGH = os.getenv("STATUS_LED_ACTIVE_HIGH", "1") != "0"
-USE_PIXEL_RING = (
-    os.getenv("USE_PIXEL_RING", "1") != "0"
-    and PIXEL_RING_SUPPORTED
-    and STATUS_LED_PIN is None
-)
 
 if GPIO_AVAILABLE:
     import RPi.GPIO as GPIO
-
-if USE_PIXEL_RING:
-    from pixel_ring import pixel_ring
-else:
-    pixel_ring = None
 
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
@@ -109,47 +98,23 @@ def set_status_led(active: bool):
 
 
 def ring_idle():
-    """LED-ring av (idle-läge)."""
+    """LED av (idle-läge)."""
     set_status_led(False)
-
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.off()
-        except Exception as e:
-            print(f"Kunde inte stänga av LED-ring: {e}")
 
 
 def ring_listening():
     """LED indikerar att assistenten är väckt och redo att lyssna."""
     set_status_led(True)
 
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.wakeup()
-        except Exception as e:
-            print(f"Kunde inte sätta LED till wakeup: {e}")
-
 
 def ring_thinking():
     """LED indikerar att agenten tänker/bearbetar."""
     set_status_led(True)
 
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.think()
-        except Exception as e:
-            print(f"Kunde inte sätta LED till think: {e}")
-
 
 def ring_speaking():
     """LED indikerar att agenten pratar."""
     set_status_led(True)
-
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.speak()
-        except Exception as e:
-            print(f"Kunde inte sätta LED till speak: {e}")
 
 
 def create_conversation():
@@ -260,11 +225,9 @@ def main():
         return
 
     try:
-        if not USE_PIXEL_RING:
-            print(
-                "Pixel-ring är inaktiverad. Använder GPIO-LED om den är "
-                "konfigurerad eller kör utan ljus."
-            )
+        print(
+            "Använder GPIO-LED om den är konfigurerad, annars körs utan ljus."
+        )
 
         if hasattr(os, "geteuid") and os.geteuid() != 0:
             print("Varning: RPi.GPIO svarar normalt bara för root. Kör med sudo.")

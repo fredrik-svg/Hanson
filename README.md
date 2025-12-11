@@ -6,7 +6,7 @@ This project is a Swedish voice assistant running on a Raspberry Pi 5 using:
 - [ElevenLabs Agents Platform](https://elevenlabs.io/docs/agents-platform)
 - Seeed Studio **ReSpeaker USB Mic Array** (USB, not HAT)
 - A Bluetooth speaker for audio output
-- The built‑in **pixel_ring** LED on the ReSpeaker to indicate assistant status
+- A GPIO-driven LED to indicate assistant status
 - A physical button between **GPIO 17** and **GND** that starts a conversation when
   pressed
 
@@ -78,8 +78,7 @@ python hotword.py
 The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 
 - Press the button to start a conversation with the ElevenLabs agent.
-- The ReSpeaker **pixel ring** shows different patterns when listening,
-  thinking and speaking.
+- En LED kopplad till ett GPIO-stift kan visa status (lyssnar/tänker/talar).
 - When the conversation ends, the script returns to waiting for the next
   button press.
 
@@ -87,19 +86,16 @@ The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 > `RPi.GPIO` kräver root. Om knappen inte reagerar – kör skriptet med `sudo`
 > eller lägg till lämplig `udev`-regel.
 
-## GPIO LED in place of the pixel ring
+## GPIO-LED
 
-If you prefer a simple LED connected directly to the Raspberry Pi instead of
-the ReSpeaker pixel ring, set these environment variables before running
-`hotword.py`:
+Ange dessa variabler innan du kör `hotword.py`:
 
 - `STATUS_LED_PIN` – GPIO number for the LED (e.g. `27`).
 - `STATUS_LED_ACTIVE_HIGH` – set to `0` if your LED lights when driven LOW
   (default is `1`, i.e. active HIGH).
-- `USE_PIXEL_RING=0` – optional; forces the pixel ring off even if available.
 
-With `STATUS_LED_PIN` set, the script will drive that pin HIGH/LOW to show the
-assistant state.
+Med `STATUS_LED_PIN` satt styr skriptet pinnen HIGH/LOW för att visa
+assistentens status. Utelämnas variabeln körs skriptet utan statusljus.
 
 ## Notes
 
