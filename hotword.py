@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import signal
+import threading
 import time
 
 from dotenv import load_dotenv
@@ -18,32 +19,26 @@ load_dotenv()
 BUTTON_PIN = 17
 
 GPIO_AVAILABLE = importlib.util.find_spec("RPi.GPIO") is not None
-PIXEL_RING_SUPPORTED = importlib.util.find_spec("pixel_ring") is not None
 
 status_led_pin_env = os.getenv("STATUS_LED_PIN")
 try:
     STATUS_LED_PIN = int(status_led_pin_env) if status_led_pin_env else None
 except ValueError:
     print(
-        "Ogiltigt värde för STATUS_LED_PIN – ange ett GPIO-nummer, t.ex. 27. "
-        "Ignorerar LED-konfigurationen."
+        "Invalid value for STATUS_LED_PIN – provide a GPIO number, e.g. 27. "
+        "Ignoring LED configuration."
     )
     STATUS_LED_PIN = None
 
 STATUS_LED_ACTIVE_HIGH = os.getenv("STATUS_LED_ACTIVE_HIGH", "1") != "0"
-USE_PIXEL_RING = (
-    os.getenv("USE_PIXEL_RING", "1") != "0"
-    and PIXEL_RING_SUPPORTED
-    and STATUS_LED_PIN is None
-)
+thinking_blink_env = os.getenv("THINKING_BLINK_SECONDS", "0.05")
+try:
+    THINKING_BLINK_SECONDS = float(thinking_blink_env)
+except ValueError:
+    THINKING_BLINK_SECONDS = 0.05
 
 if GPIO_AVAILABLE:
     import RPi.GPIO as GPIO
-
-if USE_PIXEL_RING:
-    from pixel_ring import pixel_ring
-else:
-    pixel_ring = None
 
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
@@ -55,7 +50,7 @@ if not api_key:
 
 elevenlabs = ElevenLabs(api_key=api_key)
 
-# Dynamiska variabler som kan användas i din agentprompt
+# Dynamic variables that can be used in your agent prompt
 dynamic_vars = {
     "user_name": "Fredrik",
     "greeting": "Hej",
@@ -65,10 +60,28 @@ dynamic_vars = {
 config = ConversationInitiationData(dynamic_variables=dynamic_vars)
 
 STATUS_LED_INITIALIZED = False
+THINKING_TIMER = None
+
+
+def _complete_thinking():
+    """Reset thinking blink state."""
+
+    global THINKING_TIMER
+    set_status_led(False)
+    THINKING_TIMER = None
+
+
+def _cancel_thinking_timer():
+    """Cancel any pending thinking blink."""
+
+    global THINKING_TIMER
+    if THINKING_TIMER:
+        THINKING_TIMER.cancel()
+        THINKING_TIMER = None
 
 
 def setup_status_led():
-    """Initiera status-LED via GPIO om en pinne är angiven."""
+    """Initialize status LED via GPIO if a pin is provided."""
 
     global STATUS_LED_INITIALIZED
 
@@ -83,20 +96,19 @@ def setup_status_led():
         )
         STATUS_LED_INITIALIZED = True
         print(
-            f"Status-LED styrs via GPIO {STATUS_LED_PIN} (aktiveras med "
+            f"Status LED controlled via GPIO {STATUS_LED_PIN} (active with "
             f"{'HIGH' if STATUS_LED_ACTIVE_HIGH else 'LOW'})."
         )
     except RuntimeError as e:
         print(
-            "Kunde inte initiera status-LED via GPIO. Kontrollera att skriptet "
-            "körs med root-behörighet och att pinnen inte används av något "
-            "annat."
+            "Could not initialize status LED via GPIO. Ensure the script runs "
+            "with root privileges and that the pin is not used by anything else."
         )
-        print(f"Detaljer: {e}")
+        print(f"Details: {e}")
 
 
 def set_status_led(active: bool):
-    """Sätt på/av status-LED om den är initierad."""
+    """Turn status LED on/off if initialized."""
 
     if not STATUS_LED_INITIALIZED:
         return
@@ -105,55 +117,46 @@ def set_status_led(active: bool):
     try:
         GPIO.output(STATUS_LED_PIN, level)
     except RuntimeError as e:
-        print(f"Kunde inte styra status-LED: {e}")
+        print(f"Could not control status LED: {e}")
 
 
 def ring_idle():
-    """LED-ring av (idle-läge)."""
+    """LED off (idle state)."""
+    _cancel_thinking_timer()
     set_status_led(False)
-
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.off()
-        except Exception as e:
-            print(f"Kunde inte stänga av LED-ring: {e}")
 
 
 def ring_listening():
-    """LED indikerar att assistenten är väckt och redo att lyssna."""
+    """LED indicates the assistant is awake and ready to listen."""
+    _cancel_thinking_timer()
     set_status_led(True)
-
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.wakeup()
-        except Exception as e:
-            print(f"Kunde inte sätta LED till wakeup: {e}")
 
 
 def ring_thinking():
-    """LED indikerar att agenten tänker/bearbetar."""
+    """LED indicates the agent is thinking/processing."""
+    global THINKING_TIMER
+
+    if THINKING_TIMER:
+        THINKING_TIMER.cancel()
+        THINKING_TIMER = None
+
     set_status_led(True)
 
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.think()
-        except Exception as e:
-            print(f"Kunde inte sätta LED till think: {e}")
+    if THINKING_BLINK_SECONDS > 0:
+        THINKING_TIMER = threading.Timer(
+            THINKING_BLINK_SECONDS, _complete_thinking
+        )
+        THINKING_TIMER.start()
 
 
 def ring_speaking():
-    """LED indikerar att agenten pratar."""
+    """LED indicates the agent is speaking."""
+    _cancel_thinking_timer()
     set_status_led(True)
-
-    if USE_PIXEL_RING:
-        try:
-            pixel_ring.speak()
-        except Exception as e:
-            print(f"Kunde inte sätta LED till speak: {e}")
 
 
 def create_conversation():
-    """Skapa en ny ElevenLabs-konversation."""
+    """Create a new ElevenLabs conversation."""
 
     def on_agent_response(response: str):
         print(f"Agent: {response}")
@@ -164,7 +167,7 @@ def create_conversation():
         ring_speaking()
 
     def on_user_transcript(transcript: str):
-        print(f"Du: {transcript}")
+        print(f"You: {transcript}")
         ring_thinking()
 
     return Conversation(
@@ -180,9 +183,9 @@ def create_conversation():
 
 
 def start_conversation_flow():
-    """Starta en ElevenLabs-session och hantera städning."""
+    """Start an ElevenLabs session and handle cleanup."""
 
-    print("Startar ElevenLabs-session...")
+    print("Starting ElevenLabs session...")
     ring_listening()
 
     try:
@@ -190,64 +193,64 @@ def start_conversation_flow():
         conversation.start_session()
 
         def signal_handler(sig, frame):
-            print("Avbryter session...")
+            print("Cancelling session...")
             try:
                 conversation.end_session()
             except Exception as e:
-                print(f"Fel vid avslut av session: {e}")
+                print(f"Error ending session: {e}")
 
         signal.signal(signal.SIGINT, signal_handler)
 
         conversation_id = conversation.wait_for_session_end()
-        print(f"Samtals-ID: {conversation_id}")
+        print(f"Conversation ID: {conversation_id}")
 
     except Exception as e:
         error_text = str(e)
-        print(f"Fel under konversation: {error_text}")
+        print(f"Error during conversation: {error_text}")
         if "needs_authorization" in error_text or "authorization" in error_text:
             print(
-                "Kontrollera att ELEVENLABS_API_KEY är korrekt satt och att "
-                "nyckeln har behörighet för valt agent-ID."
+                "Check that ELEVENLABS_API_KEY is correctly set and that the key "
+                "has permission for the selected agent ID."
             )
     finally:
-        print("Session slut, städar upp...")
+        print("Session finished, cleaning up...")
         ring_idle()
         time.sleep(1)
 
 
 def manual_conversation_prompt():
-    """Fallback-läge när GPIO-knappen inte kan användas."""
+    """Fallback mode when the GPIO button cannot be used."""
 
     print(
-        "RPi.GPIO saknas eller kan inte användas. Tryck Enter för att starta "
-        "en konversation manuellt."
+        "RPi.GPIO is missing or cannot be used. Press Enter to start a "
+        "conversation manually."
     )
     try:
         while True:
-            input("\nStarta ny session (Enter): ")
+            input("\nStart new session (Enter): ")
             start_conversation_flow()
     except KeyboardInterrupt:
-        print("Avslutar via CTRL+C...")
+        print("Exiting via CTRL+C...")
     finally:
         ring_idle()
 
 
 def setup_button() -> bool:
-    """Konfigurera GPIO-knappen och ge hjälpsam felsökningsinfo."""
+    """Configure the GPIO button and provide helpful debug info."""
 
     try:
         GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     except RuntimeError as e:
-        print("Kunde inte konfigurera knappen via GPIO.")
+        print("Could not configure the button via GPIO.")
         if hasattr(os, "geteuid") and os.geteuid() != 0:
-            print("RPi.GPIO kräver root-behörighet. Kör skriptet med sudo.")
-        print(f"Detaljer: {e}")
+            print("RPi.GPIO typically requires root. Run the script with sudo.")
+        print(f"Details: {e}")
         return False
 
     initial_state = GPIO.input(BUTTON_PIN)
     print(
-        f"Knapp på GPIO {BUTTON_PIN} initierad (pull-up). Startläge: "
-        f"{'NEDTRYCKT' if initial_state == GPIO.LOW else 'uppläppt'}."
+        f"Button on GPIO {BUTTON_PIN} initialized (pull-up). Starting state: "
+        f"{'PRESSED' if initial_state == GPIO.LOW else 'released'}."
     )
     return True
 
@@ -260,14 +263,10 @@ def main():
         return
 
     try:
-        if not USE_PIXEL_RING:
-            print(
-                "Pixel-ring är inaktiverad. Använder GPIO-LED om den är "
-                "konfigurerad eller kör utan ljus."
-            )
+        print("Using GPIO LED if configured; otherwise running without light.")
 
         if hasattr(os, "geteuid") and os.geteuid() != 0:
-            print("Varning: RPi.GPIO svarar normalt bara för root. Kör med sudo.")
+            print("Warning: RPi.GPIO usually only works for root. Run with sudo.")
 
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
@@ -278,8 +277,8 @@ def main():
             return
 
         print(
-            "Hotword-stöd är borttaget. Tryck på knappen mellan GPIO 17 och "
-            "GND för att starta en konversation (CTRL+C för att avsluta)."
+            "Hotword support is removed. Press the button between GPIO 17 and "
+            "GND to start a conversation (CTRL+C to exit)."
         )
 
         while True:
@@ -289,15 +288,15 @@ def main():
                 )
             except RuntimeError as e:
                 print(
-                    "Kunde inte lyssna på knappen via GPIO. Växlar till "
-                    "manuellt läge."
+                    "Could not listen to the button via GPIO. Switching to "
+                    "manual mode."
                 )
-                print(f"Detaljer: {e}")
+                print(f"Details: {e}")
                 manual_conversation_prompt()
                 return
 
             if channel is None:
-                print("Ingen knapptryckning upptäcktes på 10 sekunder...")
+                print("No button press detected in 10 seconds...")
                 continue
 
             start_conversation_flow()
