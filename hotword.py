@@ -17,6 +17,8 @@ from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInt
 load_dotenv()
 
 BUTTON_PIN = 17
+BUTTON_DEBOUNCE_TIME = 0.3  # seconds
+BUTTON_POLL_INTERVAL = 0.05  # seconds
 
 GPIO_AVAILABLE = False
 GPIO_IMPORT_ERROR = None
@@ -292,7 +294,6 @@ def main():
         # Use polling instead of interrupt-based event detection
         # This is more reliable on Raspberry Pi 5
         last_button_state = GPIO.HIGH
-        debounce_time = 0.3  # 300ms debounce
         last_press_time = 0
 
         while True:
@@ -303,13 +304,13 @@ def main():
             if (
                 last_button_state == GPIO.HIGH
                 and current_button_state == GPIO.LOW
-                and (current_time - last_press_time) > debounce_time
+                and (current_time - last_press_time) > BUTTON_DEBOUNCE_TIME
             ):
                 last_press_time = current_time
                 start_conversation_flow()
 
             last_button_state = current_button_state
-            time.sleep(0.05)  # Poll every 50ms
+            time.sleep(BUTTON_POLL_INTERVAL)
     except KeyboardInterrupt:
         print("Avslutar via CTRL+C...")
     finally:
