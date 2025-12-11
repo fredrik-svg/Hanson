@@ -72,16 +72,15 @@ def setup_status_led():
         )
         STATUS_LED_INITIALIZED = True
         print(
-            f"Status-LED styrs via GPIO {STATUS_LED_PIN} (aktiveras med "
+            f"Status LED controlled via GPIO {STATUS_LED_PIN} (active with "
             f"{'HIGH' if STATUS_LED_ACTIVE_HIGH else 'LOW'})."
         )
     except RuntimeError as e:
         print(
-            "Kunde inte initiera status-LED via GPIO. Kontrollera att skriptet "
-            "körs med root-behörighet och att pinnen inte används av något "
-            "annat."
+            "Could not initialize status LED via GPIO. Ensure the script runs "
+            "with root privileges and that the pin is not used by anything else."
         )
-        print(f"Detaljer: {e}")
+        print(f"Details: {e}")
 
 
 def set_status_led(active: bool):
@@ -94,7 +93,7 @@ def set_status_led(active: bool):
     try:
         GPIO.output(STATUS_LED_PIN, level)
     except RuntimeError as e:
-        print(f"Kunde inte styra status-LED: {e}")
+        print(f"Could not control status LED: {e}")
 
 
 def ring_idle():
@@ -147,7 +146,7 @@ def create_conversation():
 def start_conversation_flow():
     """Start an ElevenLabs session and handle cleanup."""
 
-    print("Startar ElevenLabs-session...")
+    print("Starting ElevenLabs session...")
     ring_listening()
 
     try:
@@ -155,27 +154,27 @@ def start_conversation_flow():
         conversation.start_session()
 
         def signal_handler(sig, frame):
-            print("Avbryter session...")
+            print("Cancelling session...")
             try:
                 conversation.end_session()
             except Exception as e:
-                print(f"Fel vid avslut av session: {e}")
+                print(f"Error ending session: {e}")
 
         signal.signal(signal.SIGINT, signal_handler)
 
         conversation_id = conversation.wait_for_session_end()
-        print(f"Samtals-ID: {conversation_id}")
+        print(f"Conversation ID: {conversation_id}")
 
     except Exception as e:
         error_text = str(e)
-        print(f"Fel under konversation: {error_text}")
+        print(f"Error during conversation: {error_text}")
         if "needs_authorization" in error_text or "authorization" in error_text:
             print(
-                "Kontrollera att ELEVENLABS_API_KEY är korrekt satt och att "
-                "nyckeln har behörighet för valt agent-ID."
+                "Check that ELEVENLABS_API_KEY is correctly set and that the key "
+                "has permission for the selected agent ID."
             )
     finally:
-        print("Session slut, städar upp...")
+        print("Session finished, cleaning up...")
         ring_idle()
         time.sleep(1)
 
@@ -184,15 +183,15 @@ def manual_conversation_prompt():
     """Fallback mode when the GPIO button cannot be used."""
 
     print(
-        "RPi.GPIO saknas eller kan inte användas. Tryck Enter för att starta "
-        "en konversation manuellt."
+        "RPi.GPIO is missing or cannot be used. Press Enter to start a "
+        "conversation manually."
     )
     try:
         while True:
-            input("\nStarta ny session (Enter): ")
+            input("\nStart new session (Enter): ")
             start_conversation_flow()
     except KeyboardInterrupt:
-        print("Avslutar via CTRL+C...")
+        print("Exiting via CTRL+C...")
     finally:
         ring_idle()
 
@@ -203,16 +202,16 @@ def setup_button() -> bool:
     try:
         GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     except RuntimeError as e:
-        print("Kunde inte konfigurera knappen via GPIO.")
+        print("Could not configure the button via GPIO.")
         if hasattr(os, "geteuid") and os.geteuid() != 0:
-            print("RPi.GPIO kräver root-behörighet. Kör skriptet med sudo.")
-        print(f"Detaljer: {e}")
+            print("RPi.GPIO typically requires root. Run the script with sudo.")
+        print(f"Details: {e}")
         return False
 
     initial_state = GPIO.input(BUTTON_PIN)
     print(
-        f"Knapp på GPIO {BUTTON_PIN} initierad (pull-up). Startläge: "
-        f"{'NEDTRYCKT' if initial_state == GPIO.LOW else 'uppläppt'}."
+        f"Button on GPIO {BUTTON_PIN} initialized (pull-up). Starting state: "
+        f"{'PRESSED' if initial_state == GPIO.LOW else 'released'}."
     )
     return True
 
@@ -228,7 +227,7 @@ def main():
         print("Using GPIO LED if configured; otherwise running without light.")
 
         if hasattr(os, "geteuid") and os.geteuid() != 0:
-            print("Varning: RPi.GPIO svarar normalt bara för root. Kör med sudo.")
+            print("Warning: RPi.GPIO usually only works for root. Run with sudo.")
 
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
@@ -239,8 +238,8 @@ def main():
             return
 
         print(
-            "Hotword-stöd är borttaget. Tryck på knappen mellan GPIO 17 och "
-            "GND för att starta en konversation (CTRL+C för att avsluta)."
+            "Hotword support is removed. Press the button between GPIO 17 and "
+            "GND to start a conversation (CTRL+C to exit)."
         )
 
         while True:
@@ -250,15 +249,15 @@ def main():
                 )
             except RuntimeError as e:
                 print(
-                    "Kunde inte lyssna på knappen via GPIO. Växlar till "
-                    "manuellt läge."
+                    "Could not listen to the button via GPIO. Switching to "
+                    "manual mode."
                 )
-                print(f"Detaljer: {e}")
+                print(f"Details: {e}")
                 manual_conversation_prompt()
                 return
 
             if channel is None:
-                print("Ingen knapptryckning upptäcktes på 10 sekunder...")
+                print("No button press detected in 10 seconds...")
                 continue
 
             start_conversation_flow()
