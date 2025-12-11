@@ -18,7 +18,15 @@ load_dotenv()
 
 BUTTON_PIN = 17
 
-GPIO_AVAILABLE = importlib.util.find_spec("RPi.GPIO") is not None
+GPIO_AVAILABLE = False
+GPIO_IMPORT_ERROR = None
+
+if importlib.util.find_spec("RPi.GPIO") is not None:
+    try:
+        import RPi.GPIO as GPIO
+        GPIO_AVAILABLE = True
+    except (RuntimeError, ImportError) as e:
+        GPIO_IMPORT_ERROR = e
 
 status_led_pin_env = os.getenv("STATUS_LED_PIN")
 try:
@@ -36,9 +44,6 @@ try:
     THINKING_BLINK_SECONDS = float(thinking_blink_env)
 except ValueError:
     THINKING_BLINK_SECONDS = 0.05
-
-if GPIO_AVAILABLE:
-    import RPi.GPIO as GPIO
 
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
@@ -259,6 +264,9 @@ def main():
     ring_idle()
 
     if not GPIO_AVAILABLE:
+        if GPIO_IMPORT_ERROR:
+            print("RPi.GPIO module was found but could not be imported.")
+            print(f"Details: {GPIO_IMPORT_ERROR}")
         manual_conversation_prompt()
         return
 
