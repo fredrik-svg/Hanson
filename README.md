@@ -88,14 +88,15 @@ The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 
 ## GPIO-LED
 
-Ange dessa variabler innan du kör `hotword.py`:
+Set these variables before running `hotword.py`:
 
 - `STATUS_LED_PIN` – GPIO number for the LED (e.g. `27`).
 - `STATUS_LED_ACTIVE_HIGH` – set to `0` if your LED lights when driven LOW
   (default is `1`, i.e. active HIGH).
 
-Med `STATUS_LED_PIN` satt styr skriptet pinnen HIGH/LOW för att visa
-assistentens status. Utelämnas variabeln körs skriptet utan statusljus.
+With `STATUS_LED_PIN` set, the script drives that pin HIGH/LOW to show the
+assistant status. If the variable is omitted, the script runs without a status
+light.
 
 ## Notes
 

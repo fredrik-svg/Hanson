@@ -98,22 +98,22 @@ def set_status_led(active: bool):
 
 
 def ring_idle():
-    """LED av (idle-läge)."""
+    """LED off (idle state)."""
     set_status_led(False)
 
 
 def ring_listening():
-    """LED indikerar att assistenten är väckt och redo att lyssna."""
+    """LED indicates the assistant is awake and ready to listen."""
     set_status_led(True)
 
 
 def ring_thinking():
-    """LED indikerar att agenten tänker/bearbetar."""
+    """LED indicates the agent is thinking/processing."""
     set_status_led(True)
 
 
 def ring_speaking():
-    """LED indikerar att agenten pratar."""
+    """LED indicates the agent is speaking."""
     set_status_led(True)
 
 
