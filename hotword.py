@@ -30,6 +30,11 @@ except ValueError:
     STATUS_LED_PIN = None
 
 STATUS_LED_ACTIVE_HIGH = os.getenv("STATUS_LED_ACTIVE_HIGH", "1") != "0"
+thinking_blink_env = os.getenv("THINKING_BLINK_SECONDS", "0.05")
+try:
+    THINKING_BLINK_SECONDS = float(thinking_blink_env)
+except ValueError:
+    THINKING_BLINK_SECONDS = 0.05
 
 if GPIO_AVAILABLE:
     import RPi.GPIO as GPIO
@@ -108,8 +113,9 @@ def ring_listening():
 
 def ring_thinking():
     """LED indicates the agent is thinking/processing."""
-    set_status_led(False)
-    time.sleep(0.05)
+    if THINKING_BLINK_SECONDS > 0:
+        set_status_led(False)
+        time.sleep(THINKING_BLINK_SECONDS)
     set_status_led(True)
 
 

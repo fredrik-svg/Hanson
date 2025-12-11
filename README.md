@@ -93,6 +93,8 @@ Set these variables before running `hotword.py`:
 - `STATUS_LED_PIN` – GPIO number for the LED (e.g. `27`).
 - `STATUS_LED_ACTIVE_HIGH` – set to `0` if your LED lights when driven LOW
   (default is `1`, i.e. active HIGH).
+- `THINKING_BLINK_SECONDS` – optional blink duration (seconds) when entering
+  the thinking state; set to `0` to disable the blink.
 
 With `STATUS_LED_PIN` set, the script drives that pin HIGH/LOW to show the
 assistant status. If the variable is omitted, the script runs without a status
