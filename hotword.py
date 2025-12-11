@@ -289,30 +289,40 @@ def main():
             "GND to start a conversation (CTRL+C to exit)."
         )
 
+        button_pressed = False
+
+        def button_callback(channel):
+            """Callback for button press detection."""
+            nonlocal button_pressed
+            button_pressed = True
+
+        try:
+            GPIO.add_event_detect(
+                BUTTON_PIN, GPIO.FALLING, callback=button_callback, bouncetime=300
+            )
+        except RuntimeError as e:
+            print(
+                "Could not set up button event detection via GPIO. "
+                "Switching to manual mode."
+            )
+            print(f"Details: {e}")
+            manual_conversation_prompt()
+            return
+
         while True:
-            try:
-                channel = GPIO.wait_for_edge(
-                    BUTTON_PIN, GPIO.FALLING, bouncetime=300, timeout=10000
-                )
-            except RuntimeError as e:
-                print(
-                    "Could not listen to the button via GPIO. Switching to "
-                    "manual mode."
-                )
-                print(f"Details: {e}")
-                manual_conversation_prompt()
-                return
-
-            if channel is None:
-                print("No button press detected in 10 seconds...")
-                continue
-
-            start_conversation_flow()
+            if button_pressed:
+                button_pressed = False
+                start_conversation_flow()
+            time.sleep(0.1)
     except KeyboardInterrupt:
         print("Avslutar via CTRL+C...")
     finally:
         ring_idle()
         if GPIO_AVAILABLE:
+            try:
+                GPIO.remove_event_detect(BUTTON_PIN)
+            except (RuntimeError, ValueError):
+                pass
             GPIO.cleanup()
 
 
