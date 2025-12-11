@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import signal
+import threading
 import time
 
 from dotenv import load_dotenv
@@ -115,8 +116,11 @@ def ring_thinking():
     """LED indicates the agent is thinking/processing."""
     if THINKING_BLINK_SECONDS > 0:
         set_status_led(False)
-        time.sleep(THINKING_BLINK_SECONDS)
-    set_status_led(True)
+        threading.Timer(
+            THINKING_BLINK_SECONDS, set_status_led, args=(True,)
+        ).start()
+    else:
+        set_status_led(True)
 
 
 def ring_speaking():
