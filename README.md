@@ -78,7 +78,7 @@ python hotword.py
 The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 
 - Press the button to start a conversation with the ElevenLabs agent.
-- En LED kopplad till ett GPIO-stift kan visa status (lyssnar/tänker/talar).
+- An LED connected to a GPIO pin can show status (listening/thinking/speaking).
 - When the conversation ends, the script returns to waiting for the next
   button press.
 
