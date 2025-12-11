@@ -140,15 +140,13 @@ def ring_thinking():
         THINKING_TIMER.cancel()
         THINKING_TIMER = None
 
+    set_status_led(True)
+
     if THINKING_BLINK_SECONDS > 0:
-        set_status_led(True)
         THINKING_TIMER = threading.Timer(
             THINKING_BLINK_SECONDS, _complete_thinking
         )
-        THINKING_TIMER.daemon = True
         THINKING_TIMER.start()
-    else:
-        set_status_led(True)
 
 
 def ring_speaking():
