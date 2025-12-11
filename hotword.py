@@ -24,8 +24,8 @@ try:
     STATUS_LED_PIN = int(status_led_pin_env) if status_led_pin_env else None
 except ValueError:
     print(
-        "Ogiltigt värde för STATUS_LED_PIN – ange ett GPIO-nummer, t.ex. 27. "
-        "Ignorerar LED-konfigurationen."
+        "Invalid value for STATUS_LED_PIN – provide a GPIO number, e.g. 27. "
+        "Ignoring LED configuration."
     )
     STATUS_LED_PIN = None
 
@@ -44,7 +44,7 @@ if not api_key:
 
 elevenlabs = ElevenLabs(api_key=api_key)
 
-# Dynamiska variabler som kan användas i din agentprompt
+# Dynamic variables that can be used in your agent prompt
 dynamic_vars = {
     "user_name": "Fredrik",
     "greeting": "Hej",
@@ -57,7 +57,7 @@ STATUS_LED_INITIALIZED = False
 
 
 def setup_status_led():
-    """Initiera status-LED via GPIO om en pinne är angiven."""
+    """Initialize status LED via GPIO if a pin is provided."""
 
     global STATUS_LED_INITIALIZED
 
@@ -85,7 +85,7 @@ def setup_status_led():
 
 
 def set_status_led(active: bool):
-    """Sätt på/av status-LED om den är initierad."""
+    """Turn status LED on/off if initialized."""
 
     if not STATUS_LED_INITIALIZED:
         return
@@ -118,7 +118,7 @@ def ring_speaking():
 
 
 def create_conversation():
-    """Skapa en ny ElevenLabs-konversation."""
+    """Create a new ElevenLabs conversation."""
 
     def on_agent_response(response: str):
         print(f"Agent: {response}")
@@ -145,7 +145,7 @@ def create_conversation():
 
 
 def start_conversation_flow():
-    """Starta en ElevenLabs-session och hantera städning."""
+    """Start an ElevenLabs session and handle cleanup."""
 
     print("Startar ElevenLabs-session...")
     ring_listening()
@@ -181,7 +181,7 @@ def start_conversation_flow():
 
 
 def manual_conversation_prompt():
-    """Fallback-läge när GPIO-knappen inte kan användas."""
+    """Fallback mode when the GPIO button cannot be used."""
 
     print(
         "RPi.GPIO saknas eller kan inte användas. Tryck Enter för att starta "
@@ -198,7 +198,7 @@ def manual_conversation_prompt():
 
 
 def setup_button() -> bool:
-    """Konfigurera GPIO-knappen och ge hjälpsam felsökningsinfo."""
+    """Configure the GPIO button and provide helpful debug info."""
 
     try:
         GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
