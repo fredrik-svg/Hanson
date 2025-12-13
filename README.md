@@ -103,12 +103,12 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
    pip install -r requirements.txt
    ```
 
-4. Make sure your ReSpeaker USB Mic Array is plugged in and recognized as
-   a USB audio input device (`arecord -l` should list it).
+5. Säkerställ att din ReSpeaker USB Mic Array är inkopplad och känns igen
+   som en USB-ljudingångsenhet (`arecord -l` bör visa den).
 
-5. Pair and set your Bluetooth speaker as the default output (via `bluetoothctl`
-   and `wpctl` / `pavucontrol`). The ElevenLabs SDK will play audio to the
-   default sink.
+6. Para och ställ in din Bluetooth-högtalare som standardutgång (via
+   `bluetoothctl` och `wpctl` / `pavucontrol`). ElevenLabs SDK kommer
+   att spela upp ljud till standard sink.
 
 ## ElevenLabs configuration
 
