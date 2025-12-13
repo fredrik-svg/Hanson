@@ -83,25 +83,32 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
    cd <your-repo-folder>
    ```
 
-2. Skapa och aktivera en Python virtualenv (rekommenderat):
+2. Installera systempaket som krävs för PyAudio:
+
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y portaudio19-dev
+   ```
+
+3. Skapa och aktivera en Python virtualenv (rekommenderat):
 
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
    ```
 
-3. Install dependencies:
+4. Installera Python-beroenden:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Make sure your ReSpeaker USB Mic Array is plugged in and recognized as
-   a USB audio input device (`arecord -l` should list it).
+5. Säkerställ att din ReSpeaker USB Mic Array är inkopplad och känns igen
+   som en USB-ljudingångsenhet (`arecord -l` bör visa den).
 
-5. Pair and set your Bluetooth speaker as the default output (via `bluetoothctl`
-   and `wpctl` / `pavucontrol`). The ElevenLabs SDK will play audio to the
-   default sink.
+6. Para och ställ in din Bluetooth-högtalare som standardutgång (via
+   `bluetoothctl` och `wpctl` / `pavucontrol`). ElevenLabs SDK kommer
+   att spela upp ljud till standard sink.
 
 ## ElevenLabs configuration
 
