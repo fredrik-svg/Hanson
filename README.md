@@ -87,7 +87,7 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
 
    ```bash
    sudo apt-get update
-   sudo apt-get install -y portaudio19-dev python3-pyaudio
+   sudo apt-get install -y portaudio19-dev
    ```
 
 3. Skapa och aktivera en Python virtualenv (rekommenderat):
