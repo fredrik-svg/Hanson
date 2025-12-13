@@ -115,6 +115,44 @@ Om du vill att skriptet ska starta automatiskt när Raspberry Pi startar, se til
 
 1. Udev-regeln är installerad (alternativ 2 ovan)
 2. Användaren som kör skriptet är medlem i gpio-gruppen
-3. Konfigurera en systemd-tjänst eller lägg till i crontab med `@reboot`
+3. Konfigurera en systemd-tjänst
 
-Exempel på systemd-tjänst följer i en separat guide om det behövs.
+### Exempel på systemd-tjänst
+
+Skapa filen `/etc/systemd/system/hanson-assistant.service`:
+
+```ini
+[Unit]
+Description=Hanson Voice Assistant
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/Hanson
+Environment="PATH=/home/pi/Hanson/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="ELEVENLABS_API_KEY=your_api_key_here"
+Environment="ELEVENLABS_AGENT_ID=your_agent_id_here"
+ExecStart=/home/pi/Hanson/.venv/bin/python /home/pi/Hanson/hotword.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Aktivera och starta tjänsten:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable hanson-assistant.service
+sudo systemctl start hanson-assistant.service
+```
+
+Kontrollera status:
+
+```bash
+sudo systemctl status hanson-assistant.service
+```
+
+**Observera:** Ersätt `/home/pi/Hanson` med sökvägen till ditt projekt och uppdatera API-nycklarna.
