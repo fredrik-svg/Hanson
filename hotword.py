@@ -90,21 +90,28 @@ STATUS_LED_INITIALIZED = False
 THINKING_TIMER = None
 
 
+class SuppressAlsaErrors:
+    """Context manager to suppress ALSA errors during execution."""
+    
+    def __enter__(self):
+        self.stderr_fd = sys.stderr.fileno()
+        self.old_stderr = os.dup(self.stderr_fd)
+        self.devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(self.devnull_fd, self.stderr_fd)
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        os.dup2(self.old_stderr, self.stderr_fd)
+        os.close(self.devnull_fd)
+        os.close(self.old_stderr)
+        return False
+
+
 def suppress_alsa_errors(func):
     """Decorator to suppress ALSA errors during function execution."""
     def wrapper(*args, **kwargs):
-        stderr_fd = sys.stderr.fileno()
-        old_stderr = os.dup(stderr_fd)
-        devnull_fd = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull_fd, stderr_fd)
-        
-        try:
+        with SuppressAlsaErrors():
             return func(*args, **kwargs)
-        finally:
-            os.dup2(old_stderr, stderr_fd)
-            os.close(devnull_fd)
-            os.close(old_stderr)
-    
     return wrapper
 
 
@@ -238,17 +245,8 @@ def start_conversation_flow():
         conversation = create_conversation()
         
         # Suppress ALSA errors during audio stream initialization
-        stderr_fd = sys.stderr.fileno()
-        old_stderr = os.dup(stderr_fd)
-        devnull_fd = os.open(os.devnull, os.O_WRONLY)
-        os.dup2(devnull_fd, stderr_fd)
-        
-        try:
+        with SuppressAlsaErrors():
             conversation.start_session()
-        finally:
-            os.dup2(old_stderr, stderr_fd)
-            os.close(devnull_fd)
-            os.close(old_stderr)
 
         def signal_handler(sig, frame):
             print("Cancelling session...")
