@@ -2,16 +2,34 @@
 import importlib.util
 import os
 import signal
+import sys
 import threading
 import time
 
 from dotenv import load_dotenv
-from elevenlabs.client import ElevenLabs
-from elevenlabs.conversational_ai.conversation import (
-    Conversation,
-    ConversationInitiationData,
-)
-from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
+
+# Suppress ALSA warnings/errors before importing audio libraries
+os.environ['ALSA_CARD'] = 'default'
+os.environ['ALSA_PCM_CARD'] = 'default'
+
+# Temporarily redirect stderr to suppress ALSA errors during import
+stderr_fd = sys.stderr.fileno()
+old_stderr = os.dup(stderr_fd)
+devnull_fd = os.open(os.devnull, os.O_WRONLY)
+os.dup2(devnull_fd, stderr_fd)
+
+try:
+    from elevenlabs.client import ElevenLabs
+    from elevenlabs.conversational_ai.conversation import (
+        Conversation,
+        ConversationInitiationData,
+    )
+    from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
+finally:
+    # Restore stderr
+    os.dup2(old_stderr, stderr_fd)
+    os.close(devnull_fd)
+    os.close(old_stderr)
 
 
 load_dotenv()
@@ -21,12 +39,16 @@ BUTTON_PIN = 17
 GPIO_AVAILABLE = False
 GPIO_IMPORT_ERROR = None
 
-if importlib.util.find_spec("RPi.GPIO") is not None:
-    try:
-        import RPi.GPIO as GPIO
-        GPIO_AVAILABLE = True
-    except (RuntimeError, ImportError) as e:
-        GPIO_IMPORT_ERROR = e
+try:
+    if importlib.util.find_spec("RPi.GPIO") is not None:
+        try:
+            import RPi.GPIO as GPIO
+            GPIO_AVAILABLE = True
+        except (RuntimeError, ImportError) as e:
+            GPIO_IMPORT_ERROR = e
+except (ModuleNotFoundError, ImportError):
+    # RPi.GPIO module not found
+    pass
 
 status_led_pin_env = os.getenv("STATUS_LED_PIN")
 try:
@@ -66,6 +88,24 @@ config = ConversationInitiationData(dynamic_variables=dynamic_vars)
 
 STATUS_LED_INITIALIZED = False
 THINKING_TIMER = None
+
+
+def suppress_alsa_errors(func):
+    """Decorator to suppress ALSA errors during function execution."""
+    def wrapper(*args, **kwargs):
+        stderr_fd = sys.stderr.fileno()
+        old_stderr = os.dup(stderr_fd)
+        devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull_fd, stderr_fd)
+        
+        try:
+            return func(*args, **kwargs)
+        finally:
+            os.dup2(old_stderr, stderr_fd)
+            os.close(devnull_fd)
+            os.close(old_stderr)
+    
+    return wrapper
 
 
 def _complete_thinking():
@@ -160,6 +200,7 @@ def ring_speaking():
     set_status_led(True)
 
 
+@suppress_alsa_errors
 def create_conversation():
     """Create a new ElevenLabs conversation."""
 
@@ -195,7 +236,19 @@ def start_conversation_flow():
 
     try:
         conversation = create_conversation()
-        conversation.start_session()
+        
+        # Suppress ALSA errors during audio stream initialization
+        stderr_fd = sys.stderr.fileno()
+        old_stderr = os.dup(stderr_fd)
+        devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(devnull_fd, stderr_fd)
+        
+        try:
+            conversation.start_session()
+        finally:
+            os.dup2(old_stderr, stderr_fd)
+            os.close(devnull_fd)
+            os.close(old_stderr)
 
         def signal_handler(sig, frame):
             print("Cancelling session...")
