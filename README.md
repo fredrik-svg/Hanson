@@ -24,14 +24,66 @@ This project is a Swedish voice assistant running on a Raspberry Pi 5 using:
 
 ## Setup
 
-1. Clone this repo to your Pi:
+### SSH-inställning
+
+För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-åtkomst:
+
+1. **Aktivera SSH på Raspberry Pi:**
+
+   Om du har tillgång till en skärm och tangentbord:
+   ```bash
+   sudo raspi-config
+   ```
+   Navigera till "Interface Options" → "SSH" → "Yes"
+
+   Alternativt, aktivera SSH via terminalen:
+   ```bash
+   sudo systemctl enable ssh
+   sudo systemctl start ssh
+   ```
+
+2. **Hitta Pi:ns IP-adress:**
+
+   På Raspberry Pi:
+   ```bash
+   hostname -I
+   ```
+
+3. **Anslut från din dator:**
+
+   ```bash
+   ssh pi@<raspberry-pi-ip-address>
+   ```
+   
+   Använd det lösenord du skapade vid första uppstarten av Raspberry Pi OS. Om du använder en äldre installation med standardlösenordet `raspberry`, bör du ändra det omedelbart:
+   ```bash
+   passwd
+   ```
+
+4. **[Valfritt] Konfigurera SSH-nyckelbaserad autentisering:**
+
+   På din dator, generera ett SSH-nyckelpar (om du inte redan har ett):
+   ```bash
+   ssh-keygen -t ed25519
+   ```
+
+   Kopiera din publika nyckel till Pi:n:
+   ```bash
+   ssh-copy-id pi@<raspberry-pi-ip-address>
+   ```
+
+   Nu kan du ansluta utan lösenord.
+
+### Installera projektet
+
+1. Klona detta repository till din Pi:
 
    ```bash
    git clone <your-repo-url>.git
    cd <your-repo-folder>
    ```
 
-2. Create and activate a Python virtualenv (recommended):
+2. Skapa och aktivera en Python virtualenv (rekommenderat):
 
    ```bash
    python3 -m venv .venv
