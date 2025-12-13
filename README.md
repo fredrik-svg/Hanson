@@ -55,7 +55,7 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
    ssh pi@<raspberry-pi-ip-address>
    ```
    
-   Standardlösenordet är ofta `raspberry`, men du bör ändra det omedelbart:
+   Använd det lösenord du skapade vid första uppstarten av Raspberry Pi OS. Om du använder en äldre installation med standardlösenordet `raspberry`, bör du ändra det omedelbart:
    ```bash
    passwd
    ```
@@ -76,14 +76,14 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
 
 ### Installera projektet
 
-1. Clone this repo to your Pi:
+1. Klona detta repository till din Pi:
 
    ```bash
    git clone <your-repo-url>.git
    cd <your-repo-folder>
    ```
 
-2. Create and activate a Python virtualenv (recommended):
+2. Skapa och aktivera en Python virtualenv (rekommenderat):
 
    ```bash
    python3 -m venv .venv
