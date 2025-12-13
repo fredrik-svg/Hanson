@@ -129,6 +129,8 @@ export ELEVENLABS_AGENT_ID="your_agent_id_here"
 
 `RPi.GPIO` kräver normalt root-behörighet för att komma åt GPIO-pinnarna. Det finns två alternativ:
 
+> **För detaljerade instruktioner och felsökning, se [GPIO_PERMISSIONS.md](GPIO_PERMISSIONS.md)**
+
 ### Alternativ 1: Kör med sudo (snabbast men mindre säkert)
 
 ```bash
