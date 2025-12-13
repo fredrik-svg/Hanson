@@ -83,14 +83,21 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
    cd <your-repo-folder>
    ```
 
-2. Skapa och aktivera en Python virtualenv (rekommenderat):
+2. Installera systempaket som krävs för PyAudio:
+
+   ```bash
+   sudo apt-get update
+   sudo apt-get install -y portaudio19-dev python3-pyaudio
+   ```
+
+3. Skapa och aktivera en Python virtualenv (rekommenderat):
 
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
    ```
 
-3. Install dependencies:
+4. Installera Python-beroenden:
 
    ```bash
    pip install -r requirements.txt
