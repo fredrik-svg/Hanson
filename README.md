@@ -125,6 +125,56 @@ export ELEVENLABS_API_KEY="your_api_key_here"
 export ELEVENLABS_AGENT_ID="your_agent_id_here"
 ```
 
+## GPIO-behörighet (GPIO Permissions)
+
+`RPi.GPIO` kräver normalt root-behörighet för att komma åt GPIO-pinnarna. Det finns två alternativ:
+
+### Alternativ 1: Kör med sudo (snabbast men mindre säkert)
+
+```bash
+source .venv/bin/activate
+sudo .venv/bin/python hotword.py
+```
+
+### Alternativ 2: Konfigurera udev-regel (rekommenderas)
+
+För att köra skriptet utan `sudo` kan du installera en udev-regel som ger
+åtkomst till GPIO för användare i gruppen `gpio`:
+
+1. Lägg till din användare i `gpio`-gruppen:
+
+   ```bash
+   sudo usermod -a -G gpio $USER
+   ```
+
+2. Kopiera udev-regeln till systemet:
+
+   ```bash
+   sudo cp 99-gpio.rules /etc/udev/rules.d/
+   ```
+
+3. Ladda om udev-reglerna:
+
+   ```bash
+   sudo udevadm control --reload-rules
+   sudo udevadm trigger
+   ```
+
+4. Logga ut och logga in igen för att gruppmedlemskapet ska träda i kraft.
+
+   Alternativt starta om Raspberry Pi:
+   ```bash
+   sudo reboot
+   ```
+
+5. Verifiera att du är medlem i `gpio`-gruppen:
+
+   ```bash
+   groups
+   ```
+
+   Du bör se `gpio` i listan.
+
 ## Running
 
 From the project folder on your Pi:
@@ -140,10 +190,6 @@ The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 - An LED connected to a GPIO pin can show status (listening/thinking/speaking).
 - When the conversation ends, the script returns to waiting for the next
   button press.
-
-> **GPIO-behörighet**
-> `RPi.GPIO` kräver root. Om knappen inte reagerar – kör skriptet med `sudo`
-> eller lägg till lämplig `udev`-regel.
 
 ## GPIO-LED
 
