@@ -7,6 +7,7 @@ import threading
 import time
 
 from dotenv import load_dotenv
+import pyaudio
 
 # Suppress ALSA warnings/errors before importing audio libraries
 os.environ['ALSA_CARD'] = 'default'
@@ -200,6 +201,50 @@ def ring_speaking():
     set_status_led(True)
 
 
+def validate_audio_environment() -> bool:
+    """Check for a usable default input/output audio device.
+
+    Returns False (with a helpful message) if no audio backend is available or the
+    default device rejects the required sample format. This prevents the ElevenLabs
+    session threads from crashing on startup in environments without ALSA.
+    """
+
+    audio = None
+    try:
+        audio = pyaudio.PyAudio()
+        try:
+            input_device = audio.get_default_input_device_info()
+            output_device = audio.get_default_output_device_info()
+        except OSError as e:
+            print("No default audio device is available. Configure ALSA or set the "
+                  "PULSE_SERVER to a reachable instance before starting a session.")
+            print(f"Details: {e}")
+            return False
+
+        # Validate that the default devices can accept the typical stream format
+        # used by the ElevenLabs client.
+        try:
+            audio.is_format_supported(
+                rate=44100,
+                input_device=input_device.get("index"),
+                input_channels=1,
+                input_format=pyaudio.paInt16,
+                output_device=output_device.get("index"),
+                output_channels=1,
+                output_format=pyaudio.paInt16,
+            )
+        except ValueError as e:
+            print("The default audio device does not support 16-bit mono 44.1kHz "
+                  "streams required by the assistant.")
+            print(f"Details: {e}")
+            return False
+
+        return True
+    finally:
+        if audio:
+            audio.terminate()
+
+
 @suppress_alsa_errors
 def create_conversation():
     """Create a new ElevenLabs conversation."""
@@ -235,6 +280,10 @@ def start_conversation_flow():
     ring_listening()
 
     try:
+        if not validate_audio_environment():
+            print("Audio setup is incomplete; skipping session start.")
+            return
+
         conversation = create_conversation()
         
         # Suppress ALSA errors during audio stream initialization
