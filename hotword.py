@@ -147,10 +147,10 @@ def setup_status_led():
         )
     except RuntimeError as e:
         print(
-            "Could not initialize status LED via GPIO. Ensure the script runs "
-            "with root privileges and that the pin is not used by anything else."
+            f"Could not initialize status LED on GPIO {STATUS_LED_PIN}."
         )
         print(f"Details: {e}")
+        print("Continuing without status LED. Button functionality may still work.")
 
 
 def set_status_led(active: bool):
@@ -328,18 +328,31 @@ def start_conversation_flow():
 def manual_conversation_prompt():
     """Fallback mode when the GPIO button cannot be used."""
 
-    print(
-        "RPi.GPIO is missing or cannot be used. Press Enter to start a "
-        "conversation manually."
-    )
+    print("\n" + "="*60)
+    print("GPIO button is not available - using manual mode")
+    print("="*60)
+    print("\nPress Enter to start a conversation manually.")
+    print("See GPIO_PERMISSIONS.md for instructions on enabling GPIO button support.")
+    print("="*60 + "\n")
+    
     try:
         while True:
-            input("\nStart new session (Enter): ")
+            input("Start new session (Enter): ")
             start_conversation_flow()
     except KeyboardInterrupt:
         print("Exiting via CTRL+C...")
     finally:
         ring_idle()
+
+
+def is_user_in_gpio_group() -> bool:
+    """Check if the current user is a member of the gpio group."""
+    try:
+        import grp
+        user_groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
+        return 'gpio' in user_groups
+    except (ImportError, KeyError, OSError):
+        return False
 
 
 def setup_button() -> bool:
@@ -349,9 +362,30 @@ def setup_button() -> bool:
         GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     except RuntimeError as e:
         print("Could not configure the button via GPIO.")
-        if hasattr(os, "geteuid") and os.geteuid() != 0:
-            print("RPi.GPIO typically requires root. Run the script with sudo.")
         print(f"Details: {e}")
+        
+        # Provide helpful troubleshooting based on the situation
+        is_root = hasattr(os, "geteuid") and os.geteuid() == 0
+        in_gpio_group = is_user_in_gpio_group()
+        
+        if not is_root and not in_gpio_group:
+            print("\nTroubleshooting:")
+            print("1. Add your user to the gpio group: sudo usermod -a -G gpio $USER")
+            print("2. Install the udev rules: sudo cp 99-gpio.rules /etc/udev/rules.d/")
+            print("3. Reload udev rules: sudo udevadm control --reload-rules && sudo udevadm trigger")
+            print("4. Log out and log back in (or reboot)")
+            print("\nAlternatively, run with sudo: sudo .venv/bin/python hotword.py")
+        elif not is_root and in_gpio_group:
+            print("\nYou are in the gpio group, but GPIO access still failed.")
+            print("Try these troubleshooting steps:")
+            print("1. Verify udev rules are installed: ls -la /etc/udev/rules.d/99-gpio.rules")
+            print("2. Check /dev/gpiomem permissions: ls -la /dev/gpiomem")
+            print("3. Reload udev rules: sudo udevadm control --reload-rules && sudo udevadm trigger")
+            print("4. Log out and log back in, or reboot to ensure group membership is active")
+            print("\nFor detailed help, see GPIO_PERMISSIONS.md")
+        else:
+            print("Unexpected GPIO error. See GPIO_PERMISSIONS.md for troubleshooting.")
+        
         return False
 
     initial_state = GPIO.input(BUTTON_PIN)
@@ -367,16 +401,27 @@ def main():
 
     if not GPIO_AVAILABLE:
         if GPIO_IMPORT_ERROR:
-            print("RPi.GPIO module was found but could not be imported.")
-            print(f"Details: {GPIO_IMPORT_ERROR}")
+            print("\nRPi.GPIO module was found but could not be imported.")
+            print(f"Error details: {GPIO_IMPORT_ERROR}")
+            print("\nThis may indicate a permissions or installation issue.")
+            print("See GPIO_PERMISSIONS.md for troubleshooting steps.")
+        else:
+            print("\nRPi.GPIO module is not installed.")
+            print("This is expected on non-Raspberry Pi systems.")
         manual_conversation_prompt()
         return
 
     try:
         print("Using GPIO LED if configured; otherwise running without light.")
 
-        if hasattr(os, "geteuid") and os.geteuid() != 0:
-            print("Warning: RPi.GPIO usually only works for root. Run with sudo.")
+        is_root = hasattr(os, "geteuid") and os.geteuid() == 0
+        in_gpio_group = is_user_in_gpio_group()
+        
+        if not is_root and not in_gpio_group:
+            print("\nWarning: You are not in the gpio group.")
+            print("GPIO access may fail. See GPIO_PERMISSIONS.md for setup instructions.")
+        elif not is_root and in_gpio_group:
+            print("Running as non-root user in gpio group (recommended setup).")
 
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
