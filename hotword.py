@@ -1,4 +1,6 @@
 
+import getpass
+import grp
 import importlib.util
 import os
 import signal
@@ -348,10 +350,9 @@ def manual_conversation_prompt():
 def is_user_in_gpio_group() -> bool:
     """Check if the current user is a member of the gpio group."""
     try:
-        import grp
         user_groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
         return 'gpio' in user_groups
-    except (ImportError, KeyError, OSError):
+    except (KeyError, OSError):
         return False
 
 
@@ -369,12 +370,13 @@ def setup_button() -> bool:
         in_gpio_group = is_user_in_gpio_group()
         
         if not is_root and not in_gpio_group:
+            username = getpass.getuser()
             print("\nTroubleshooting:")
-            print("1. Add your user to the gpio group: sudo usermod -a -G gpio $USER")
+            print(f"1. Add your user to the gpio group: sudo usermod -a -G gpio {username}")
             print("2. Install the udev rules: sudo cp 99-gpio.rules /etc/udev/rules.d/")
             print("3. Reload udev rules: sudo udevadm control --reload-rules && sudo udevadm trigger")
             print("4. Log out and log back in (or reboot)")
-            print("\nAlternatively, run with sudo: sudo .venv/bin/python hotword.py")
+            print(f"\nAlternatively, run with sudo: sudo {sys.executable} hotword.py")
         elif not is_root and in_gpio_group:
             print("\nYou are in the gpio group, but GPIO access still failed.")
             print("Try these troubleshooting steps:")
