@@ -31,7 +31,8 @@ def detect_device_type(device_name: str) -> str:
         device_name: The name of the audio device.
     
     Returns:
-        A string label for the device type, or empty string if unknown.
+        A formatted string label like ' [BLUETOOTH]', ' [HDMI]', ' [USB]',
+        or empty string if device type is unknown.
     """
     name_lower = device_name.lower()
     if 'bluetooth' in name_lower or 'bluez' in name_lower:
@@ -87,7 +88,7 @@ def test_speaker():
                     print(f"  [{i}] {device_info['name']}{device_type}")
                     print(f"      Kanaler: {device_info['maxOutputChannels']}, "
                           f"Sample rate: {int(device_info['defaultSampleRate'])} Hz")
-            except (OSError, IOError) as e:
+            except (OSError, IOError):
                 # Skip devices that can't be queried (expected for some virtual devices)
                 pass
         
