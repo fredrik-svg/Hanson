@@ -2,7 +2,20 @@
 
 ## Problemet
 
-`RPi.GPIO`-biblioteket kräver root-behörighet för att komma åt GPIO-pinnarna på Raspberry Pi. Detta beror på att GPIO-gränssnitten i Linux normalt endast är tillgängliga för root-användaren av säkerhetsskäl.
+GPIO-bibliotek kräver root-behörighet eller särskilda gruppbehörigheter för att komma åt GPIO-pinnarna på Raspberry Pi. Detta beror på att GPIO-gränssnitten i Linux normalt endast är tillgängliga för root-användaren av säkerhetsskäl.
+
+## GPIO-bibliotek
+
+Detta projekt stöder två GPIO-bibliotek:
+
+- **RPi.GPIO**: Det klassiska biblioteket för äldre Raspberry Pi-modeller (Pi 1-4)
+- **libgpiod (python3-gpiod)**: Det moderna biblioteket som används på Raspberry Pi 5 och Debian Trixie
+
+Projektet detekterar automatiskt vilket bibliotek som är tillgängligt och använder det som passar bäst för ditt system.
+
+### Raspberry Pi 5 och Debian Trixie
+
+På Raspberry Pi 5 med Debian Trixie fungerar **inte RPi.GPIO** på grund av den nya RP1 I/O-kontrollern. Istället används **libgpiod** som kommunicerar via `/dev/gpiochip4` (eller liknande). Detta är den rekommenderade metoden framåt.
 
 ## Lösningar
 
@@ -84,11 +97,12 @@ En bättre lösning är att konfigurera systemet så att användare i gruppen `g
 
 Filen `99-gpio.rules` innehåller regler som:
 
-1. Ger gruppen `gpio` läs- och skrivbehörighet till `/dev/gpiomem`
+1. Ger gruppen `gpio` läs- och skrivbehörighet till `/dev/gpiomem` (för RPi.GPIO)
 2. Sätter rätt behörigheter på GPIO export/unexport-gränssnitten
 3. Sätter rätt behörigheter på individuella GPIO-pinnar när de aktiveras
+4. Ger gruppen `gpio` åtkomst till `/dev/gpiochip*` enheter (för libgpiod på Pi 5)
 
-Detta gör att program som använder `RPi.GPIO` kan komma åt GPIO-pinnarna utan root-behörighet, så länge användaren är medlem i `gpio`-gruppen.
+Detta gör att program som använder `RPi.GPIO` eller `libgpiod` kan komma åt GPIO-pinnarna utan root-behörighet, så länge användaren är medlem i `gpio`-gruppen.
 
 ## Felsökning
 
@@ -97,6 +111,7 @@ Detta gör att program som använder `RPi.GPIO` kan komma åt GPIO-pinnarna utan
 - Kontrollera att du är medlem i gpio-gruppen: `groups`
 - Om gpio inte visas, kontrollera att du lagt till användaren: `sudo usermod -a -G gpio $USER`
 - Logga ut och logga in igen, eller starta om
+- **För Raspberry Pi 5**: Kontrollera behörigheter på gpiochip: `ls -la /dev/gpiochip*`
 
 ### "RuntimeError: Not running on a RPi"
 
@@ -108,6 +123,13 @@ Detta gör att program som använder `RPi.GPIO` kan komma åt GPIO-pinnarna utan
 - Kontrollera hårdvaruanslutningen: knappen ska vara mellan GPIO 17 och GND
 - Testa med sudo först för att bekräfta att hårdvaran fungerar: `sudo .venv/bin/python hotword.py`
 - Om det fungerar med sudo men inte utan, kör igenom stegen för udev-regeln igen
+
+### "Could not find accessible gpiochip device" på Raspberry Pi 5
+
+- Installera libgpiod: `sudo apt-get install python3-gpiod`
+- Kontrollera att `/dev/gpiochip*` finns: `ls -la /dev/gpiochip*`
+- Verifiera att udev-regeln är installerad: `cat /etc/udev/rules.d/99-gpio.rules`
+- Ladda om udev-regler: `sudo udevadm control --reload-rules && sudo udevadm trigger`
 
 ## Automatisk start vid uppstart
 

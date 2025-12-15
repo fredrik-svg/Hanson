@@ -4,3 +4,4 @@ elevenlabs
 pyaudio
 python-dotenv
 RPi.GPIO; sys_platform == "linux"
+gpiod; sys_platform == "linux"
