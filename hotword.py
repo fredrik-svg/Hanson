@@ -38,14 +38,18 @@ finally:
 load_dotenv()
 
 BUTTON_PIN = 17
+# List of gpiochip devices to try, in order (gpiochip4 is typical for Pi 5)
+GPIOCHIP_SEARCH_ORDER = [4, 0, 1, 2, 3]
 
 GPIO_AVAILABLE = False
 GPIO_IMPORT_ERROR = None
 GPIO_BACKEND = None  # 'RPi.GPIO' or 'gpiod'
 GPIO = None
 gpiod_chip = None
+gpiod_chip_path = None  # Track which chip we're using
 gpiod_button_line = None
 gpiod_led_line = None
+stop_gpio_polling = None  # Threading event for graceful shutdown
 
 # Try to import gpiod first (for Raspberry Pi 5 / Debian Trixie)
 try:
@@ -148,6 +152,32 @@ def _cancel_thinking_timer():
         THINKING_TIMER = None
 
 
+def _get_or_open_gpiochip():
+    """Get existing gpiochip or open a new one.
+    
+    Returns the gpiochip object and its path, or (None, None) if not available.
+    This ensures we reuse the same chip across LED and button setup.
+    """
+    global gpiod_chip, gpiod_chip_path
+    
+    if gpiod_chip is not None:
+        return gpiod_chip, gpiod_chip_path
+    
+    import gpiod
+    
+    for chip_num in GPIOCHIP_SEARCH_ORDER:
+        chip_path = f'/dev/gpiochip{chip_num}'
+        if os.path.exists(chip_path):
+            try:
+                gpiod_chip = gpiod.Chip(chip_path)
+                gpiod_chip_path = chip_path
+                return gpiod_chip, gpiod_chip_path
+            except (OSError, FileNotFoundError):
+                continue
+    
+    return None, None
+
+
 def setup_status_led():
     """Initialize status LED via GPIO if a pin is provided."""
 
@@ -159,29 +189,22 @@ def setup_status_led():
     try:
         if GPIO_BACKEND == 'gpiod':
             import gpiod
-            # Try to find the correct gpiochip (usually gpiochip4 on Pi 5)
-            for chip_num in [4, 0, 1, 2, 3]:
-                chip_path = f'/dev/gpiochip{chip_num}'
-                if os.path.exists(chip_path):
-                    try:
-                        gpiod_chip = gpiod.Chip(chip_path)
-                        gpiod_led_line = gpiod_chip.get_line(STATUS_LED_PIN)
-                        initial_value = 0 if STATUS_LED_ACTIVE_HIGH else 1
-                        gpiod_led_line.request(
-                            consumer='hanson-led',
-                            type=gpiod.LINE_REQ_DIR_OUT,
-                            default_vals=[initial_value]
-                        )
-                        STATUS_LED_INITIALIZED = True
-                        print(
-                            f"Status LED controlled via {chip_path} GPIO {STATUS_LED_PIN} "
-                            f"(active with {'HIGH' if STATUS_LED_ACTIVE_HIGH else 'LOW'})."
-                        )
-                        break
-                    except (OSError, FileNotFoundError):
-                        continue
-            if not STATUS_LED_INITIALIZED:
+            chip, chip_path = _get_or_open_gpiochip()
+            if chip is None:
                 raise RuntimeError("Could not find accessible gpiochip device")
+            
+            gpiod_led_line = chip.get_line(STATUS_LED_PIN)
+            initial_value = 0 if STATUS_LED_ACTIVE_HIGH else 1
+            gpiod_led_line.request(
+                consumer='hanson-led',
+                type=gpiod.LINE_REQ_DIR_OUT,
+                default_vals=[initial_value]
+            )
+            STATUS_LED_INITIALIZED = True
+            print(
+                f"Status LED controlled via {chip_path} GPIO {STATUS_LED_PIN} "
+                f"(active with {'HIGH' if STATUS_LED_ACTIVE_HIGH else 'LOW'})."
+            )
         else:  # RPi.GPIO
             GPIO.setup(
                 STATUS_LED_PIN,
@@ -409,33 +432,27 @@ def is_user_in_gpio_group() -> bool:
 def setup_button() -> bool:
     """Configure the GPIO button and provide helpful debug info."""
 
-    global gpiod_chip, gpiod_button_line
+    global gpiod_button_line
 
     try:
         if GPIO_BACKEND == 'gpiod':
             import gpiod
-            # Try to find the correct gpiochip (usually gpiochip4 on Pi 5)
-            for chip_num in [4, 0, 1, 2, 3]:
-                chip_path = f'/dev/gpiochip{chip_num}'
-                if os.path.exists(chip_path):
-                    try:
-                        if gpiod_chip is None:
-                            gpiod_chip = gpiod.Chip(chip_path)
-                        gpiod_button_line = gpiod_chip.get_line(BUTTON_PIN)
-                        gpiod_button_line.request(
-                            consumer='hanson-button',
-                            type=gpiod.LINE_REQ_EV_FALLING_EDGE,
-                            flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP
-                        )
-                        initial_state = gpiod_button_line.get_value()
-                        print(
-                            f"Button on {chip_path} GPIO {BUTTON_PIN} initialized (pull-up). "
-                            f"Starting state: {'PRESSED' if initial_state == 0 else 'released'}."
-                        )
-                        return True
-                    except (OSError, FileNotFoundError):
-                        continue
-            raise RuntimeError("Could not find accessible gpiochip device")
+            chip, chip_path = _get_or_open_gpiochip()
+            if chip is None:
+                raise RuntimeError("Could not find accessible gpiochip device")
+            
+            gpiod_button_line = chip.get_line(BUTTON_PIN)
+            gpiod_button_line.request(
+                consumer='hanson-button',
+                type=gpiod.LINE_REQ_EV_FALLING_EDGE,
+                flags=gpiod.LINE_REQ_FLAG_BIAS_PULL_UP
+            )
+            initial_state = gpiod_button_line.get_value()
+            print(
+                f"Button on {chip_path} GPIO {BUTTON_PIN} initialized (pull-up). "
+                f"Starting state: {'PRESSED' if initial_state == 0 else 'released'}."
+            )
+            return True
         else:  # RPi.GPIO
             GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
             initial_state = GPIO.input(BUTTON_PIN)
@@ -528,12 +545,15 @@ def main():
 
         if GPIO_BACKEND == 'gpiod':
             # For gpiod, we need to poll for events
+            global stop_gpio_polling
+            stop_gpio_polling = threading.Event()
+            
             def poll_button():
                 import gpiod
                 last_debounce_time = 0
                 debounce_delay = 0.3  # 300ms debounce
                 
-                while True:
+                while not stop_gpio_polling.is_set():
                     try:
                         if gpiod_button_line.event_wait(nsec=100000000):  # 100ms timeout
                             event = gpiod_button_line.event_read()
@@ -542,7 +562,8 @@ def main():
                                 button_event.set()
                                 last_debounce_time = current_time
                     except Exception as e:
-                        print(f"Error reading button event: {e}")
+                        if not stop_gpio_polling.is_set():
+                            print(f"Error reading button event: {e}")
                         break
 
             button_thread = threading.Thread(target=poll_button, daemon=True)
@@ -575,6 +596,11 @@ def main():
         ring_idle()
         if GPIO_AVAILABLE:
             if GPIO_BACKEND == 'gpiod':
+                # Signal polling thread to stop
+                if stop_gpio_polling:
+                    stop_gpio_polling.set()
+                    time.sleep(0.2)  # Give thread time to exit gracefully
+                
                 # Release gpiod lines
                 if gpiod_button_line:
                     try:
