@@ -110,6 +110,66 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
    `bluetoothctl` och `wpctl` / `pavucontrol`). ElevenLabs SDK kommer
    att spela upp ljud till standard sink.
 
+### Testa högtalaren via ALSA
+
+Innan du kör röstassistenten är det bra att verifiera att din högtalare
+fungerar korrekt. Här är några metoder för att testa ljudutgången:
+
+#### Metod 1: Använd det inkluderade testskriptet (rekommenderas)
+
+Projektet innehåller ett enkelt testskript som spelar upp en testton:
+
+```bash
+python test_speaker.py
+```
+
+Skriptet kommer att:
+- Visa din standard ljudutgång
+- Spela upp en 440 Hz testton i 2 sekunder
+- Ge felsökningsinformation om något går fel
+
+Om du hör tonen fungerar din högtalare korrekt!
+
+#### Metod 2: Testa med ALSA speaker-test
+
+Du kan använda ALSA:s inbyggda testverktyg:
+
+```bash
+speaker-test -t wav -c 2
+```
+
+Detta spelar upp en "front left, front right" testfil kontinuerligt.
+Tryck `CTRL+C` för att stoppa.
+
+För en kortare test (5 sekunder):
+```bash
+speaker-test -t wav -c 2 -l 1
+```
+
+#### Metod 3: Spela upp en ljudfil
+
+Om du har en wav-fil kan du testa med `aplay`:
+
+```bash
+aplay /usr/share/sounds/alsa/Front_Center.wav
+```
+
+#### Vanliga problem och lösningar
+
+**Problem: "No default output device"**
+- Kontrollera anslutna enheter: `aplay -l`
+- Sätt standardenhet i `~/.asoundrc` eller `/etc/asound.conf`
+- För Bluetooth-högtalare: para med `bluetoothctl` och sätt som standard med `wpctl`
+
+**Problem: Inget ljud hörs**
+- Kontrollera volymen: `alsamixer`
+- Verifiera Bluetooth-anslutning: `bluetoothctl info <MAC-adress>`
+- Testa olika enheter: `aplay -D plughw:1,0 testfile.wav`
+
+**Problem: "Permission denied" eller liknande**
+- Lägg till din användare i audio-gruppen: `sudo usermod -a -G audio $USER`
+- Logga ut och in igen
+
 ## ElevenLabs configuration
 
 1. Create an **Agent** in the ElevenLabs dashboard.
