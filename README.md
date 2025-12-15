@@ -158,9 +158,13 @@ python test_speaker.py
 ```
 
 Skriptet kommer att:
+- **Lista ALLA tillgängliga ljudutgångar**, inklusive Bluetooth-högtalare
 - Visa din standard ljudutgång
 - Spela upp en 440 Hz testton i 2 sekunder
 - Ge felsökningsinformation om något går fel
+
+**Detta är det bästa sättet att se om din Bluetooth-högtalare är tillgänglig!**  
+(Bluetooth-högtalare syns inte i `aplay -l` utan bara här.)
 
 Om du hör tonen fungerar din högtalare korrekt!
 
@@ -191,10 +195,18 @@ aplay /usr/share/sounds/alsa/Front_Center.wav
 #### Vanliga problem och lösningar
 
 **Problem: "No default output device"**
-- Kontrollera anslutna enheter: `aplay -l`
+- Kontrollera hårdvaruenheter (HDMI, USB): `aplay -l`
 - För **Debian Trixie (PipeWire)**: Använd `wpctl status` för att lista enheter
-- Sätt standardenhet i `~/.asoundrc` eller `/etc/asound.conf` (ALSA)
 - För Bluetooth-högtalare: para med `bluetoothctl` och sätt som standard med `wpctl`
+- Kör `python test_speaker.py` för att se alla tillgängliga enheter (inklusive Bluetooth)
+- Sätt standardenhet i `~/.asoundrc` eller `/etc/asound.conf` (ALSA)
+
+**OBS: Bluetooth-högtalare visas INTE i `aplay -l`**  
+`aplay -l` listar endast ALSA hårdvaruenheter (HDMI, USB, etc.). Bluetooth-högtalare 
+hanteras av PulseAudio/PipeWire och syns i:
+- `wpctl status` (PipeWire/Debian Trixie)
+- `pactl list sinks` (PulseAudio)
+- `python test_speaker.py` (PyAudio - rekommenderas)
 
 **Problem: Inget ljud hörs**
 - Kontrollera volymen: `alsamixer` eller `wpctl set-volume @DEFAULT_AUDIO_SINK@ <volym>`
@@ -209,6 +221,21 @@ aplay /usr/share/sounds/alsa/Front_Center.wav
 **Problem: PyAudio hittar ingen enhet på Debian Trixie**
 - Installera pipewire-alsa: `sudo apt-get install pipewire-alsa`
 - Starta om PipeWire: `systemctl --user restart pipewire`
+
+**Problem: PipeWire RTKit-varningar (org.freedesktop.DBus.Error)**
+Dessa varningar är vanliga och normalt inte problematiska:
+```
+mod.rt: RTKit error: org.freedesktop.DBus.Error...
+mod.rt: RTKit does not give us MaxRealtimePriority/MinNiceLevel/RTTimeUSecsMax
+```
+- **Vad det betyder:** PipeWire kunde inte få realtidsprioritet från RTKit
+- **Påverkan:** Minimal - ljudet fungerar fortfarande, men med något högre latens
+- **Lösning (valfritt):** Installera och konfigurera RTKit för bättre ljudprestanda:
+  ```bash
+  sudo apt-get install rtkit
+  systemctl --user restart pipewire
+  ```
+- **Alternativ:** Ignorera varningarna om ljudet fungerar acceptabelt
 
 ## ElevenLabs configuration
 
