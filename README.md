@@ -100,10 +100,20 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
    Om du kör Debian 13 Trixie behöver du även installera PipeWire ALSA-plugin:
    
    ```bash
-   sudo apt-get install -y pipewire-alsa python3-gpiod
+   sudo apt-get install -y pipewire-alsa
    ```
    
-   Detta säkerställer att PyAudio kan kommunicera med PipeWire och att GPIO fungerar på Raspberry Pi 5.
+   Detta säkerställer att PyAudio kan kommunicera med PipeWire.
+   
+   **För GPIO på Raspberry Pi 5:**
+   
+   GPIO-stöd installeras automatiskt via Python-paketet `gpiod` (steg 4 nedan). Om du föredrar systemversionen av libgpiod kan du försöka installera den:
+   
+   ```bash
+   sudo apt-get install -y python3-gpiod
+   ```
+   
+   **Obs:** Om kommandot ovan ger felet "Unable to locate package python3-gpiod", oroa dig inte - Python-paketet `gpiod` från PyPI (installerat i steg 4) fungerar lika bra och installeras automatiskt.
 
 3. Skapa och aktivera en Python virtualenv (rekommenderat):
 
@@ -296,6 +306,31 @@ Set these variables before running `hotword.py`:
 With `STATUS_LED_PIN` set, the script drives that pin HIGH/LOW to show the
 assistant status. If the variable is omitted, the script runs without a status
 light.
+
+## Troubleshooting
+
+### "Unable to locate package python3-gpiod" error
+
+Om du får felet "E: Unable to locate package python3-gpiod" när du försöker installera systemversionen:
+
+**Detta är normalt och inget problem!** 
+
+Paketet `python3-gpiod` är inte tillgängligt i alla Debian/Ubuntu/Raspberry Pi OS-versioner. Projektet är utformat för att fungera utan systemversionen:
+
+1. **Hoppa över systempaketets installation** - du behöver det inte
+2. **Installera istället Python-paketet** via pip (inkluderat i requirements.txt):
+   ```bash
+   pip install gpiod
+   ```
+3. **Kör projektet som vanligt** - GPIO-stöd fungerar med PyPI-versionen
+
+Projektet detekterar automatiskt vilket GPIO-bibliotek som är tillgängligt och använder rätt.
+
+### Andra vanliga problem
+
+Se också:
+- **GPIO-behörigheter och felsökning**: [GPIO_PERMISSIONS.md](GPIO_PERMISSIONS.md)
+- **Debian Trixie-specifika problem**: [DEBIAN_TRIXIE.md](DEBIAN_TRIXIE.md)
 
 ## Notes
 
