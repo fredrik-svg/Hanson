@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """
-Test script för att verifiera att ALSA-högtalare fungerar korrekt.
+Test script för att verifiera att högtalare fungerar korrekt.
 
-Detta skript spelar upp en testton via ALSA för att bekräfta att
-ljudutgången fungerar som förväntat innan du kör huvudassistenten.
+Detta skript listar alla tillgängliga ljudutgångar (inklusive Bluetooth)
+och spelar upp en testton för att bekräfta att ljudutgången fungerar
+som förväntat innan du kör huvudassistenten.
+
+OBS: Bluetooth-högtalare visas INTE i 'aplay -l' eftersom det bara listar
+ALSA hårdvaruenheter. Bluetooth hanteras av PulseAudio/PipeWire och visas
+i PyAudio-listan som detta skript genererar.
 """
 
 import sys
@@ -30,7 +35,7 @@ def test_speaker():
     """
     
     print("=" * 60)
-    print("ALSA Högtalare Test")
+    print("ALSA/PipeWire Högtalare Test")
     print("=" * 60)
     print()
     
@@ -47,19 +52,61 @@ def test_speaker():
         # Initiera PyAudio
         audio = pyaudio.PyAudio()
         
-        # Lista tillgängliga utgångsenheter
+        # Lista ALLA tillgängliga utgångsenheter
         print("Tillgängliga ljudutgångar:")
         print("-" * 60)
+        device_count = audio.get_device_count()
+        output_devices = []
+        
+        for i in range(device_count):
+            try:
+                device_info = audio.get_device_info_by_index(i)
+                if device_info['maxOutputChannels'] > 0:
+                    output_devices.append(device_info)
+                    device_type = ""
+                    name_lower = device_info['name'].lower()
+                    if 'bluetooth' in name_lower or 'bluez' in name_lower:
+                        device_type = " [BLUETOOTH]"
+                    elif 'hdmi' in name_lower:
+                        device_type = " [HDMI]"
+                    elif 'usb' in name_lower:
+                        device_type = " [USB]"
+                    
+                    print(f"  [{i}] {device_info['name']}{device_type}")
+                    print(f"      Kanaler: {device_info['maxOutputChannels']}, "
+                          f"Sample rate: {int(device_info['defaultSampleRate'])} Hz")
+            except Exception as e:
+                # Skip devices that can't be queried
+                pass
+        
+        if not output_devices:
+            print("Inga utgångsenheter hittades!")
+            print("\nKonfigurera PulseAudio/PipeWire eller anslut en högtalare och försök igen.")
+            return False
+        
+        print()
+        print("-" * 60)
+        
+        # Hämta standardenhet
         default_output = None
         try:
             default_output = audio.get_default_output_device_info()
-            print(f"Standard utgång: {default_output['name']}")
+            device_type = ""
+            name_lower = default_output['name'].lower()
+            if 'bluetooth' in name_lower or 'bluez' in name_lower:
+                device_type = " [BLUETOOTH]"
+            elif 'hdmi' in name_lower:
+                device_type = " [HDMI]"
+            elif 'usb' in name_lower:
+                device_type = " [USB]"
+            
+            print(f"Standard utgång: {default_output['name']}{device_type}")
             print(f"  Index: {default_output['index']}")
             print(f"  Kanaler: {default_output['maxOutputChannels']}")
             print(f"  Sample rate: {int(default_output['defaultSampleRate'])} Hz")
         except OSError as e:
             print(f"Ingen standardutgång hittades: {e}")
-            print("\nKonfigurera ALSA eller anslut en högtalare och försök igen.")
+            print("\nKonfigurera PulseAudio/PipeWire eller anslut en högtalare och försök igen.")
             return False
         
         print()
@@ -95,12 +142,19 @@ def test_speaker():
         
         print("✓ Testton spelad upp!")
         print()
-        print("Om du hörde tonen fungerar din högtalare korrekt via ALSA.")
+        print("Om du hörde tonen fungerar din högtalare korrekt!")
+        print()
         print("Om du inte hörde något, kontrollera:")
         print("  1. Att högtalaren är påslagen och ansluten")
         print("  2. Volymen på systemet och högtalaren")
-        print("  3. ALSA-konfigurationen med: aplay -l")
-        print("  4. Bluetooth-anslutningen om du använder Bluetooth-högtalare")
+        print("  3. För Bluetooth-högtalare:")
+        print("     - Para enheten med: bluetoothctl")
+        print("     - Kontrollera anslutning: bluetoothctl info <MAC-adress>")
+        print("     - Sätt som standard (Debian Trixie): wpctl set-default <node-id>")
+        print("  4. För andra enheter, kontrollera ALSA: aplay -l")
+        print()
+        print("OBS: Bluetooth-högtalare visas INTE i 'aplay -l' (endast hårdvaruenheter).")
+        print("     De hanteras av PulseAudio/PipeWire och visas i listan ovan.")
         print()
         
         return True
@@ -110,8 +164,13 @@ def test_speaker():
         print()
         print("Felsökning:")
         print("  - Kontrollera att portaudio är installerat: sudo apt-get install portaudio19-dev")
-        print("  - Lista ALSA-enheter: aplay -l")
+        print("  - För Debian Trixie: sudo apt-get install pipewire-alsa")
+        print("  - Lista hårdvaruenheter (HDMI, USB, etc): aplay -l")
         print("  - Testa ALSA direkt: speaker-test -t wav -c 2")
+        print("  - För Bluetooth, använd: bluetoothctl och wpctl/pactl")
+        print()
+        print("OBS: Bluetooth-högtalare visas INTE i 'aplay -l' - de hanteras av")
+        print("     PulseAudio/PipeWire. Använd detta skript för att se alla enheter.")
         return False
         
     finally:
