@@ -117,13 +117,27 @@ Koden stöder båda backends transparent utan att användaren behöver ändra n�
 
 ### Installation
 
-För Debian Trixie / Raspberry Pi 5:
+**Rekommenderad metod (fungerar alltid):**
+
+GPIO-stöd installeras automatiskt via `requirements.txt` som inkluderar Python-paketet `gpiod`:
+
+```bash
+pip install -r requirements.txt
+```
+
+**Alternativ metod (systempaket):**
+
+Om du föredrar att använda systemversionen av libgpiod kan du försöka installera den:
 
 ```bash
 sudo apt-get install python3-gpiod
 ```
 
-För äldre Pi-modeller fungerar RPi.GPIO som vanligt:
+**Obs:** Om kommandot ovan ger felet "Unable to locate package python3-gpiod", använd istället Python-paketet från PyPI (rekommenderad metod ovan). Båda metoderna fungerar lika bra.
+
+**För äldre Pi-modeller:**
+
+RPi.GPIO installeras också automatiskt via requirements.txt, eller kan installeras manuellt:
 
 ```bash
 pip install RPi.GPIO
@@ -204,8 +218,15 @@ ls -la /dev/gpiochip*
 # Verifiera behörigheter
 groups  # Ska inkludera 'gpio'
 
-# Installera python3-gpiod om det saknas
+# Kontrollera att gpiod är installerat
+python -c "import gpiod; print('gpiod OK')"
+
+# Om inte installerat, installera via pip (rekommenderat):
+pip install gpiod
+
+# Alternativt, försök systemversionen (om tillgänglig):
 sudo apt-get install python3-gpiod
+# Obs: Om du får "Unable to locate package", använd pip-metoden ovan istället
 
 # Ladda om udev-regler
 sudo udevadm control --reload-rules

@@ -126,7 +126,9 @@ Detta gör att program som använder `RPi.GPIO` eller `libgpiod` kan komma åt G
 
 ### "Could not find accessible gpiochip device" på Raspberry Pi 5
 
-- Installera libgpiod: `sudo apt-get install python3-gpiod`
+- Kontrollera att gpiod är installerat: `python -c "import gpiod; print('gpiod OK')"`
+- Om inte installerat, installera via pip: `pip install gpiod` (rekommenderat)
+- Alternativt, försök systemversionen: `sudo apt-get install python3-gpiod` (obs: inte tillgänglig på alla system)
 - Kontrollera att `/dev/gpiochip*` finns: `ls -la /dev/gpiochip*`
 - Verifiera att udev-regeln är installerad: `cat /etc/udev/rules.d/99-gpio.rules`
 - Ladda om udev-regler: `sudo udevadm control --reload-rules && sudo udevadm trigger`
