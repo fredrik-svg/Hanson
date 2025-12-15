@@ -1,6 +1,8 @@
 
 # Swedish ElevenLabs Voice Assistant on Raspberry Pi 5 (ReSpeaker USB Mic Array)
 
+> **Nytt! Debian Trixie-stöd**: Projektet stöder nu fullt ut Debian 13 (Trixie) på Raspberry Pi 5 med PipeWire och libgpiod. Se [DEBIAN_TRIXIE.md](DEBIAN_TRIXIE.md) för detaljer.
+
 This project is a Swedish voice assistant running on a Raspberry Pi 5 using:
 
 - [ElevenLabs Agents Platform](https://elevenlabs.io/docs/agents-platform)
