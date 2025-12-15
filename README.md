@@ -18,9 +18,12 @@ This project is a Swedish voice assistant running on a Raspberry Pi 5 using:
 - Bluetooth speaker paired with Raspberry Pi
 
 > **OS-version att välja?**
-> Rekommenderad version är fortfarande Raspberry Pi OS **Bookworm 64‑bit**.
-> Projektet har tagit bort hotword‑motorn helt, så det fungerar även på
-> Python 3.12+ utan att behöva den äldre EfficientWord‑Net‑beroenden.
+> Projektet stöder både Raspberry Pi OS **Bookworm 64‑bit** och **Debian 13 (Trixie)**.
+> 
+> **För Raspberry Pi 5 med Debian Trixie:**
+> - Ljudsystemet använder **PipeWire** istället för ALSA direkt
+> - GPIO-hanteringen använder **libgpiod** istället för RPi.GPIO
+> - Projektet detekterar automatiskt vilket system som används och anpassar sig
 
 ## Setup
 
@@ -90,6 +93,16 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
    sudo apt-get install -y portaudio19-dev
    ```
 
+   **För Debian Trixie (med PipeWire):**
+   
+   Om du kör Debian 13 Trixie behöver du även installera PipeWire ALSA-plugin:
+   
+   ```bash
+   sudo apt-get install -y pipewire-alsa python3-gpiod
+   ```
+   
+   Detta säkerställer att PyAudio kan kommunicera med PipeWire och att GPIO fungerar på Raspberry Pi 5.
+
 3. Skapa och aktivera en Python virtualenv (rekommenderat):
 
    ```bash
@@ -109,11 +122,20 @@ För att konfigurera och köra projektet på din Raspberry Pi rekommenderas SSH-
 6. Para och ställ in din Bluetooth-högtalare som standardutgång (via
    `bluetoothctl` och `wpctl` / `pavucontrol`). ElevenLabs SDK kommer
    att spela upp ljud till standard sink.
+   
+   **För Debian Trixie:** Använd `wpctl` för att sätta standardutgång med PipeWire:
+   ```bash
+   wpctl status          # Lista tillgängliga enheter
+   wpctl set-default <node-id>  # Sätt standardenhet
+   ```
 
-### Testa högtalaren via ALSA
+### Testa högtalaren
 
 Innan du kör röstassistenten är det bra att verifiera att din högtalare
 fungerar korrekt. Här är några metoder för att testa ljudutgången:
+
+> **Observera:** På Debian Trixie använder systemet PipeWire som ljudserver, 
+> men PyAudio och ALSA-verktyg fungerar fortfarande genom pipewire-alsa-pluginen.
 
 #### Metod 1: Använd det inkluderade testskriptet (rekommenderas)
 
@@ -158,17 +180,23 @@ aplay /usr/share/sounds/alsa/Front_Center.wav
 
 **Problem: "No default output device"**
 - Kontrollera anslutna enheter: `aplay -l`
-- Sätt standardenhet i `~/.asoundrc` eller `/etc/asound.conf`
+- För **Debian Trixie (PipeWire)**: Använd `wpctl status` för att lista enheter
+- Sätt standardenhet i `~/.asoundrc` eller `/etc/asound.conf` (ALSA)
 - För Bluetooth-högtalare: para med `bluetoothctl` och sätt som standard med `wpctl`
 
 **Problem: Inget ljud hörs**
-- Kontrollera volymen: `alsamixer`
+- Kontrollera volymen: `alsamixer` eller `wpctl set-volume @DEFAULT_AUDIO_SINK@ <volym>`
 - Verifiera Bluetooth-anslutning: `bluetoothctl info <MAC-adress>`
 - Testa olika enheter: `aplay -D plughw:1,0 testfile.wav`
+- **För Debian Trixie**: Kontrollera att PipeWire körs: `systemctl --user status pipewire`
 
 **Problem: "Permission denied" eller liknande**
 - Lägg till din användare i audio-gruppen: `sudo usermod -a -G audio $USER`
 - Logga ut och in igen
+
+**Problem: PyAudio hittar ingen enhet på Debian Trixie**
+- Installera pipewire-alsa: `sudo apt-get install pipewire-alsa`
+- Starta om PipeWire: `systemctl --user restart pipewire`
 
 ## ElevenLabs configuration
 
