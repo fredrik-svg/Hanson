@@ -11,9 +11,12 @@ ALSA hårdvaruenheter. Bluetooth hanteras av PulseAudio/PipeWire och visas
 i PyAudio-listan som detta skript genererar.
 """
 
-import sys
+import contextlib
+import ctypes
 import math
 import struct
+import sys
+from typing import Iterator, Optional
 
 try:
     import pyaudio
@@ -22,6 +25,44 @@ except ImportError:
     print("Installera det med: pip install pyaudio")
     print("Du kan också behöva: sudo apt-get install portaudio19-dev")
     sys.exit(1)
+
+ERROR_HANDLER_FUNC = ctypes.CFUNCTYPE(
+    None, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p
+)
+
+try:
+    alsa = ctypes.cdll.LoadLibrary("libasound.so.2")
+except OSError:
+    alsa = None
+
+
+def _ignore_alsa_errors(
+    filename: Optional[bytes],
+    line: int,
+    function: Optional[bytes],
+    err: int,
+    fmt: Optional[bytes],
+) -> None:
+    """No-op error handler to silence ALSA noise when enumerating devices."""
+
+
+c_error_handler = ERROR_HANDLER_FUNC(_ignore_alsa_errors)
+
+
+@contextlib.contextmanager
+def suppress_alsa_errors() -> Iterator[None]:
+    """Temporarily silence ALSA stderr chatter under device probing."""
+
+    if alsa is None:
+        # ALSA-biblioteket saknas, så det finns inget att tysta
+        yield
+        return
+
+    try:
+        alsa.snd_lib_error_set_handler(c_error_handler)
+        yield
+    finally:
+        alsa.snd_lib_error_set_handler(None)
 
 
 def detect_device_type(device_name: str) -> str:
@@ -69,8 +110,9 @@ def test_speaker():
     stream = None
     
     try:
-        # Initiera PyAudio
-        audio = pyaudio.PyAudio()
+        # Initiera PyAudio utan att spamma ALSA-varningar
+        with suppress_alsa_errors():
+            audio = pyaudio.PyAudio()
         
         # Lista ALLA tillgängliga utgångsenheter
         print("Tillgängliga ljudutgångar:")
@@ -80,7 +122,8 @@ def test_speaker():
         
         for i in range(device_count):
             try:
-                device_info = audio.get_device_info_by_index(i)
+                with suppress_alsa_errors():
+                    device_info = audio.get_device_info_by_index(i)
                 if device_info['maxOutputChannels'] > 0:
                     output_devices.append(device_info)
                     device_type = detect_device_type(device_info['name'])
@@ -103,7 +146,8 @@ def test_speaker():
         # Hämta standardenhet
         default_output = None
         try:
-            default_output = audio.get_default_output_device_info()
+            with suppress_alsa_errors():
+                default_output = audio.get_default_output_device_info()
             device_type = detect_device_type(default_output['name'])
             
             print(f"Standard utgång: {default_output['name']}{device_type}")
@@ -121,13 +165,14 @@ def test_speaker():
         print()
         
         # Öppna stream
-        stream = audio.open(
-            format=pyaudio.paFloat32,
-            channels=1,
-            rate=SAMPLE_RATE,
-            output=True,
-            output_device_index=default_output['index']
-        )
+        with suppress_alsa_errors():
+            stream = audio.open(
+                format=pyaudio.paFloat32,
+                channels=1,
+                rate=SAMPLE_RATE,
+                output=True,
+                output_device_index=default_output['index']
+            )
         
         # Generera och spela upp sinus-våg
         samples_per_buffer = 1024
@@ -200,3 +245,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
