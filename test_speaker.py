@@ -24,6 +24,25 @@ except ImportError:
     sys.exit(1)
 
 
+def detect_device_type(device_name: str) -> str:
+    """Detect device type from its name.
+    
+    Args:
+        device_name: The name of the audio device.
+    
+    Returns:
+        A string label for the device type, or empty string if unknown.
+    """
+    name_lower = device_name.lower()
+    if 'bluetooth' in name_lower or 'bluez' in name_lower:
+        return " [BLUETOOTH]"
+    elif 'hdmi' in name_lower:
+        return " [HDMI]"
+    elif 'usb' in name_lower:
+        return " [USB]"
+    return ""
+
+
 def test_speaker():
     """Spelar upp en 440 Hz testton (A4) i 2 sekunder.
     
@@ -63,20 +82,13 @@ def test_speaker():
                 device_info = audio.get_device_info_by_index(i)
                 if device_info['maxOutputChannels'] > 0:
                     output_devices.append(device_info)
-                    device_type = ""
-                    name_lower = device_info['name'].lower()
-                    if 'bluetooth' in name_lower or 'bluez' in name_lower:
-                        device_type = " [BLUETOOTH]"
-                    elif 'hdmi' in name_lower:
-                        device_type = " [HDMI]"
-                    elif 'usb' in name_lower:
-                        device_type = " [USB]"
+                    device_type = detect_device_type(device_info['name'])
                     
                     print(f"  [{i}] {device_info['name']}{device_type}")
                     print(f"      Kanaler: {device_info['maxOutputChannels']}, "
                           f"Sample rate: {int(device_info['defaultSampleRate'])} Hz")
-            except Exception as e:
-                # Skip devices that can't be queried
+            except (OSError, IOError) as e:
+                # Skip devices that can't be queried (expected for some virtual devices)
                 pass
         
         if not output_devices:
@@ -91,14 +103,7 @@ def test_speaker():
         default_output = None
         try:
             default_output = audio.get_default_output_device_info()
-            device_type = ""
-            name_lower = default_output['name'].lower()
-            if 'bluetooth' in name_lower or 'bluez' in name_lower:
-                device_type = " [BLUETOOTH]"
-            elif 'hdmi' in name_lower:
-                device_type = " [HDMI]"
-            elif 'usb' in name_lower:
-                device_type = " [USB]"
+            device_type = detect_device_type(default_output['name'])
             
             print(f"Standard utgång: {default_output['name']}{device_type}")
             print(f"  Index: {default_output['index']}")

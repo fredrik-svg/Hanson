@@ -222,6 +222,21 @@ hanteras av PulseAudio/PipeWire och syns i:
 - Installera pipewire-alsa: `sudo apt-get install pipewire-alsa`
 - Starta om PipeWire: `systemctl --user restart pipewire`
 
+**Problem: PipeWire RTKit-varningar (org.freedesktop.DBus.Error)**
+Dessa varningar är vanliga och normalt inte problematiska:
+```
+mod.rt: RTKit error: org.freedesktop.DBus.Error...
+mod.rt: RTKit does not give us MaxRealtimePriority/MinNiceLevel/RTTimeUSecsMax
+```
+- **Vad det betyder:** PipeWire kunde inte få realtidsprioritet från RTKit
+- **Påverkan:** Minimal - ljudet fungerar fortfarande, men med något högre latens
+- **Lösning (valfritt):** Installera och konfigurera RTKit för bättre ljudprestanda:
+  ```bash
+  sudo apt-get install rtkit
+  systemctl --user restart pipewire
+  ```
+- **Alternativ:** Ignorera varningarna om ljudet fungerar acceptabelt
+
 ## ElevenLabs configuration
 
 1. Create an **Agent** in the ElevenLabs dashboard.

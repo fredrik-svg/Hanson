@@ -90,6 +90,25 @@ wpctl status
 speaker-test -t wav -c 2
 ```
 
+**Problem: PipeWire RTKit-varningar**
+
+Om du ser varningar som:
+```
+mod.rt: RTKit error: org.freedesktop.DBus.Error...
+mod.rt: RTKit does not give us MaxRealtimePriority
+```
+
+Detta är vanligt och normalt inte problematiskt:
+- **Vad det betyder:** PipeWire kunde inte få realtidsprioritet från RTKit
+- **Påverkan:** Ljudet fungerar fortfarande, men med något högre latens
+- **Orsak:** RTKit är inte installerat eller användaren saknar behörighet för realtidsprioritet
+- **Lösning (valfritt):** 
+  ```bash
+  sudo apt-get install rtkit
+  systemctl --user restart pipewire
+  ```
+- **Alternativ:** Ignorera varningarna om ljudprestandan är acceptabel
+
 ## GPIO-hantering: libgpiod
 
 ### Vad har ändrats?
