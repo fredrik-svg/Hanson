@@ -20,7 +20,14 @@ except ImportError:
 
 
 def test_speaker():
-    """Spelar upp en 440 Hz testton (A4) i 2 sekunder."""
+    """Spelar upp en 440 Hz testton (A4) i 2 sekunder.
+    
+    Returns:
+        bool: True om testet lyckades, False om det misslyckades.
+    
+    Raises:
+        Exception: Om PyAudio inte kan initialiseras eller spela upp ljud.
+    """
     
     print("=" * 60)
     print("ALSA Högtalare Test")
@@ -71,7 +78,7 @@ def test_speaker():
         
         # Generera och spela upp sinus-våg
         samples_per_buffer = 1024
-        num_buffers = int((SAMPLE_RATE * DURATION) / samples_per_buffer)
+        num_buffers = math.ceil((SAMPLE_RATE * DURATION) / samples_per_buffer)
         
         for i in range(num_buffers):
             # Generera samples för denna buffer
@@ -117,7 +124,7 @@ def test_speaker():
 
 
 def main():
-    """Huvudfunktion."""
+    """Huvudfunktion som kör högtalartest och hanterar avslutningskoder."""
     try:
         success = test_speaker()
         sys.exit(0 if success else 1)
