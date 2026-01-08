@@ -228,8 +228,6 @@ def setup_led_ring():
         return
     
     try:
-        from rpi_ws281x import PixelStrip, Color
-        
         # LED strip configuration:
         LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
         LED_DMA = 10          # DMA channel to use for generating signal (try 10)
@@ -275,7 +273,6 @@ def set_led_ring_color(red, green, blue):
         return
     
     try:
-        from rpi_ws281x import Color
         color = Color(red, green, blue)
         for i in range(LED_RING_COUNT):
             neopixel_strip.setPixelColor(i, color)
@@ -291,13 +288,11 @@ def clear_led_ring():
         return
     
     try:
-        from rpi_ws281x import Color
         for i in range(LED_RING_COUNT):
             neopixel_strip.setPixelColor(i, Color(0, 0, 0))
         neopixel_strip.show()
     except Exception as e:
         print(f"Error clearing LED ring: {e}")
-
 
 
 def setup_status_led():
