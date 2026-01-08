@@ -322,6 +322,8 @@ The assistant will wait for a button press on **GPIO 17** (wired to **GND**):
 
 ## GPIO-LED
 
+### Simple LED (original)
+
 Set these variables before running `hotword.py`:
 
 - `STATUS_LED_PIN` – GPIO number for the LED (e.g. `27`).
@@ -333,6 +335,46 @@ Set these variables before running `hotword.py`:
 With `STATUS_LED_PIN` set, the script drives that pin HIGH/LOW to show the
 assistant status. If the variable is omitted, the script runs without a status
 light.
+
+### WS2812b RGB LED Ring (new)
+
+The project now supports AZ-Delivery RGB LED Ring WS2812b (12 LEDs) for more visual feedback with different colors for each state:
+
+- **Idle**: LEDs off
+- **Listening**: Blue color
+- **Thinking**: Yellow color
+- **Speaking**: Green color
+
+To use the LED ring, set these environment variables:
+
+- `LED_RING_ENABLED` – set to `1` to enable the LED ring (default is `0`)
+- `LED_RING_PIN` – GPIO number for the LED ring data pin (default is `18`)
+- `LED_RING_COUNT` – number of LEDs in the ring (default is `12`)
+- `LED_RING_BRIGHTNESS` – brightness level 0-255 (default is `128`)
+
+Example:
+```bash
+export LED_RING_ENABLED=1
+export LED_RING_PIN=18
+export LED_RING_COUNT=12
+export LED_RING_BRIGHTNESS=128
+```
+
+**Important notes:**
+- WS2812b LED control requires the `rpi-ws281x` library (included in `requirements.txt`)
+- The LED ring typically requires root privileges or proper PWM permissions
+- GPIO 18 is recommended as it supports hardware PWM (required for WS2812b)
+- When LED ring is enabled, it takes precedence over the simple LED configuration
+- If LED ring initialization fails, the system will fall back to simple LED if configured
+
+**Running with LED ring:**
+```bash
+# Using sudo (recommended for WS2812b)
+source .venv/bin/activate
+sudo -E .venv/bin/python hotword.py
+```
+
+The `-E` flag preserves environment variables when running with sudo.
 
 ## Troubleshooting
 

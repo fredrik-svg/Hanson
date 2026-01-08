@@ -51,6 +51,11 @@ gpiod_button_line = None
 gpiod_led_line = None
 stop_gpio_polling = None  # Threading event for graceful shutdown
 
+# WS2812b LED Ring support
+NEOPIXEL_AVAILABLE = False
+NEOPIXEL_IMPORT_ERROR = None
+neopixel_strip = None
+
 # Try to import gpiod first (for Raspberry Pi 5 / Debian Trixie)
 try:
     if importlib.util.find_spec("gpiod") is not None:
@@ -77,6 +82,17 @@ if not GPIO_AVAILABLE:
         # RPi.GPIO module not found
         pass
 
+# Try to import NeoPixel library for WS2812b LED Ring support
+try:
+    if importlib.util.find_spec("rpi_ws281x") is not None:
+        try:
+            from rpi_ws281x import PixelStrip, Color
+            NEOPIXEL_AVAILABLE = True
+        except (RuntimeError, ImportError) as e:
+            NEOPIXEL_IMPORT_ERROR = e
+except (ModuleNotFoundError, ImportError):
+    pass
+
 status_led_pin_env = os.getenv("STATUS_LED_PIN")
 try:
     STATUS_LED_PIN = int(status_led_pin_env) if status_led_pin_env else None
@@ -93,6 +109,30 @@ try:
     THINKING_BLINK_SECONDS = float(thinking_blink_env)
 except ValueError:
     THINKING_BLINK_SECONDS = 0.05
+
+# WS2812b LED Ring configuration
+led_ring_enabled_env = os.getenv("LED_RING_ENABLED", "0")
+LED_RING_ENABLED = led_ring_enabled_env == "1"
+
+led_ring_count_env = os.getenv("LED_RING_COUNT", "12")
+try:
+    LED_RING_COUNT = int(led_ring_count_env)
+except ValueError:
+    LED_RING_COUNT = 12
+
+led_ring_pin_env = os.getenv("LED_RING_PIN", "18")
+try:
+    LED_RING_PIN = int(led_ring_pin_env)
+except ValueError:
+    LED_RING_PIN = 18
+
+led_ring_brightness_env = os.getenv("LED_RING_BRIGHTNESS", "128")
+try:
+    LED_RING_BRIGHTNESS = int(led_ring_brightness_env)
+    # Clamp brightness to valid range (0-255)
+    LED_RING_BRIGHTNESS = max(0, min(255, LED_RING_BRIGHTNESS))
+except ValueError:
+    LED_RING_BRIGHTNESS = 128
 
 agent_id = os.getenv("ELEVENLABS_AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
@@ -114,6 +154,7 @@ dynamic_vars = {
 config = ConversationInitiationData(dynamic_variables=dynamic_vars)
 
 STATUS_LED_INITIALIZED = False
+LED_RING_INITIALIZED = False
 THINKING_TIMER = None
 
 
@@ -178,10 +219,93 @@ def _get_or_open_gpiochip():
     return None, None
 
 
+def setup_led_ring():
+    """Initialize WS2812b LED Ring if enabled and available."""
+    
+    global LED_RING_INITIALIZED, neopixel_strip
+    
+    if not LED_RING_ENABLED or not NEOPIXEL_AVAILABLE:
+        return
+    
+    try:
+        # LED strip configuration:
+        LED_FREQ_HZ = 800000  # LED signal frequency in hertz (usually 800khz)
+        LED_DMA = 10          # DMA channel to use for generating signal (try 10)
+        LED_INVERT = False    # True to invert the signal (when using NPN transistor level shift)
+        LED_CHANNEL = 0       # Set to '1' for GPIOs 13, 19, 41, 45 or 53
+        
+        # Create NeoPixel object with appropriate configuration
+        neopixel_strip = PixelStrip(
+            LED_RING_COUNT,
+            LED_RING_PIN,
+            LED_FREQ_HZ,
+            LED_DMA,
+            LED_INVERT,
+            LED_RING_BRIGHTNESS,
+            LED_CHANNEL
+        )
+        
+        # Initialize the library (must be called once before other functions)
+        neopixel_strip.begin()
+        
+        # Turn off all LEDs initially
+        for i in range(LED_RING_COUNT):
+            neopixel_strip.setPixelColor(i, Color(0, 0, 0))
+        neopixel_strip.show()
+        
+        LED_RING_INITIALIZED = True
+        print(
+            f"LED Ring initialized: {LED_RING_COUNT} LEDs on GPIO {LED_RING_PIN} "
+            f"(brightness: {LED_RING_BRIGHTNESS}/255)."
+        )
+    except Exception as e:
+        print(f"Could not initialize LED Ring on GPIO {LED_RING_PIN}.")
+        print(f"Details: {e}")
+        print("Continuing without LED Ring. Falling back to simple LED if configured.")
+        print("Note: WS2812b LED control requires root privileges or proper permissions.")
+        print("Try running with sudo if you want to use the LED Ring.")
+
+
+def set_led_ring_color(red, green, blue):
+    """Set all LEDs in the ring to the specified RGB color."""
+    
+    if not LED_RING_INITIALIZED:
+        return
+    
+    try:
+        color = Color(red, green, blue)
+        for i in range(LED_RING_COUNT):
+            neopixel_strip.setPixelColor(i, color)
+        neopixel_strip.show()
+    except Exception as e:
+        print(f"Error setting LED ring color: {e}")
+
+
+def clear_led_ring():
+    """Turn off all LEDs in the ring."""
+    
+    if not LED_RING_INITIALIZED:
+        return
+    
+    try:
+        for i in range(LED_RING_COUNT):
+            neopixel_strip.setPixelColor(i, Color(0, 0, 0))
+        neopixel_strip.show()
+    except Exception as e:
+        print(f"Error clearing LED ring: {e}")
+
+
 def setup_status_led():
     """Initialize status LED via GPIO if a pin is provided."""
 
     global STATUS_LED_INITIALIZED, gpiod_chip, gpiod_led_line
+
+    # Try to initialize LED Ring first if enabled
+    if LED_RING_ENABLED:
+        setup_led_ring()
+        # If LED Ring was successfully initialized, we're done
+        if LED_RING_INITIALIZED:
+            return
 
     if not GPIO_AVAILABLE or STATUS_LED_PIN is None:
         return
@@ -227,6 +351,11 @@ def setup_status_led():
 def set_status_led(active: bool):
     """Turn status LED on/off if initialized."""
 
+    # If LED Ring is initialized, it takes precedence
+    # (but we don't control it here, individual ring_ functions handle colors)
+    if LED_RING_INITIALIZED:
+        return
+
     if not STATUS_LED_INITIALIZED:
         return
 
@@ -244,13 +373,20 @@ def set_status_led(active: bool):
 def ring_idle():
     """LED off (idle state)."""
     _cancel_thinking_timer()
-    set_status_led(False)
+    if LED_RING_INITIALIZED:
+        clear_led_ring()
+    else:
+        set_status_led(False)
 
 
 def ring_listening():
     """LED indicates the assistant is awake and ready to listen."""
     _cancel_thinking_timer()
-    set_status_led(True)
+    if LED_RING_INITIALIZED:
+        # Blue color for listening
+        set_led_ring_color(0, 0, 255)
+    else:
+        set_status_led(True)
 
 
 def ring_thinking():
@@ -261,19 +397,27 @@ def ring_thinking():
         THINKING_TIMER.cancel()
         THINKING_TIMER = None
 
-    set_status_led(True)
+    if LED_RING_INITIALIZED:
+        # Yellow color for thinking
+        set_led_ring_color(255, 255, 0)
+    else:
+        set_status_led(True)
 
-    if THINKING_BLINK_SECONDS > 0:
-        THINKING_TIMER = threading.Timer(
-            THINKING_BLINK_SECONDS, _complete_thinking
-        )
-        THINKING_TIMER.start()
+        if THINKING_BLINK_SECONDS > 0:
+            THINKING_TIMER = threading.Timer(
+                THINKING_BLINK_SECONDS, _complete_thinking
+            )
+            THINKING_TIMER.start()
 
 
 def ring_speaking():
     """LED indicates the agent is speaking."""
     _cancel_thinking_timer()
-    set_status_led(True)
+    if LED_RING_INITIALIZED:
+        # Green color for speaking
+        set_led_ring_color(0, 255, 0)
+    else:
+        set_status_led(True)
 
 
 def validate_audio_environment() -> bool:
@@ -594,6 +738,14 @@ def main():
         print("Avslutar via CTRL+C...")
     finally:
         ring_idle()
+        
+        # Cleanup LED Ring if initialized
+        if LED_RING_INITIALIZED:
+            try:
+                clear_led_ring()
+            except Exception as e:
+                print(f"Warning: Could not clear LED ring: {e}")
+        
         if GPIO_AVAILABLE:
             if GPIO_BACKEND == 'gpiod':
                 # Signal polling thread to stop
